@@ -1610,7 +1610,7 @@
 
   (no_connect (at 212.09 52.07) (uuid 52e187b6-ad72-4aaa-9010-ae097e1a5155))
   (no_connect (at 72.39 132.08) (uuid 5d92340d-9b04-4186-a7a6-88653df25022))
-  (no_connect (at 74.93 132.08) (uuid 5d92340d-9b04-4186-a7a6-88653df25022))
+  (no_connect (at 74.93 132.08) (uuid 5d92340d-9b04-4186-a7a6-88653df25023))
 
   (wire (pts (xy 273.05 29.21) (xy 274.32 29.21))
     (stroke (width 0) (type default) (color 0 0 0 0))
