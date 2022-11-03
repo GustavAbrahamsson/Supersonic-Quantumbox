@@ -2344,14 +2344,14 @@
   )
 
   (no_connect (at 196.85 25.4) (uuid 4a4c495e-9ecd-4981-8aa0-b90128fc26f1))
-  (no_connect (at 217.17 25.4) (uuid 4a4c495e-9ecd-4981-8aa0-b90128fc26f1))
+  (no_connect (at 217.17 25.4) (uuid 4a4c495e-9ecd-4981-8aa0-b90128fc26f2))
   (no_connect (at 212.09 52.07) (uuid 52e187b6-ad72-4aaa-9010-ae097e1a5155))
   (no_connect (at 59.69 132.08) (uuid 5d92340d-9b04-4186-a7a6-88653df25022))
   (no_connect (at 62.23 132.08) (uuid 5d92340d-9b04-4186-a7a6-88653df25023))
   (no_connect (at 207.01 25.4) (uuid 870224aa-1154-45af-aadc-fa174bc50ae0))
   (no_connect (at 224.79 105.41) (uuid 8f68408c-f3ad-4dc0-9412-97ddf7efb080))
   (no_connect (at 342.9 60.96) (uuid e53d26c0-e715-4ceb-956c-0e571cf36843))
-  (no_connect (at 342.9 63.5) (uuid e53d26c0-e715-4ceb-956c-0e571cf36843))
+  (no_connect (at 342.9 63.5) (uuid e53d26c0-e715-4ceb-956c-0e571cf36844))
 
   (wire (pts (xy 135.89 22.86) (xy 135.89 24.13))
     (stroke (width 0) (type default) (color 0 0 0 0))
@@ -3998,7 +3998,7 @@
     (property "Reference" "#PWR0124" (id 0) (at 281.94 135.89 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Value" "+3V3" (id 1) (at 273.05 134.6199 90)
+    (property "Value" "+3V3" (id 1) (at 270.51 134.6199 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Footprint" "" (id 2) (at 278.13 135.89 0)
@@ -4036,6 +4036,9 @@
     (property "Datasheet" "~" (id 3) (at 85.09 193.04 0)
       (effects (font (size 1.27 1.27)) hide)
     )
+    (pin "1" (uuid f80c9353-1371-4ac2-a3fe-3c48b88b02f5))
+    (pin "2" (uuid 6fecb7b3-ef3d-4da6-9d91-57f091c44310))
+    (pin "3" (uuid fcd784d4-f3bc-4084-8a2a-7b74ccc9478b))
     (pin "4" (uuid c01de446-5fc7-4e31-819a-e2a0eb48eb76))
     (pin "5" (uuid 9caf5c40-891a-47f4-95ef-a98c67372229))
     (pin "6" (uuid b9465c95-dda7-4a49-904c-32db4d52083a))
@@ -5815,6 +5818,9 @@
     (pin "1" (uuid 27a4f887-dd5a-4020-8088-91fcecac0851))
     (pin "2" (uuid 0de65f3b-473a-4d67-abc9-5ae1d834ab59))
     (pin "3" (uuid 2c5c452a-ecdb-47c0-857f-ac4020201da0))
+    (pin "4" (uuid 80e302b7-97a6-4d5e-8db8-a2ecb63bf436))
+    (pin "5" (uuid f3d70c8e-f430-4b64-af12-2fd415c5bbfb))
+    (pin "6" (uuid 1c9d575b-ff65-4860-bd12-894efe8ae385))
   )
 
   (symbol (lib_id "Switch:SW_Push") (at 237.49 69.85 0) (unit 1)
@@ -6574,10 +6580,10 @@
       (reference "D2") (unit 1) (value "WS2812B") (footprint "LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm")
     )
     (path "/2617224a-f69a-48d1-b2a5-2492a163990a"
-      (reference "D3") (unit 1) (value "LED2") (footprint "")
+      (reference "D3") (unit 1) (value "LED2") (footprint "SupersonicQuantumbox:38 mm LED")
     )
     (path "/5ef8d7b2-8fc8-4f84-ae46-e8f6a43a45c0"
-      (reference "D4") (unit 1) (value "LED1") (footprint "")
+      (reference "D4") (unit 1) (value "LED1") (footprint "SupersonicQuantumbox:38 mm LED")
     )
     (path "/3359374b-bccb-4c0d-8386-f383440986f1"
       (reference "D5") (unit 1) (value "PWR_LED") (footprint "LED_SMD:LED_0805_2012Metric_Pad1.15x1.40mm_HandSolder")
@@ -6691,7 +6697,7 @@
       (reference "SW4") (unit 1) (value "SW_DPDT_x2") (footprint "SupersonicQuantumbox:Stomp_switch")
     )
     (path "/2c8bc3cc-6dd3-4f97-bd0d-8eec23ff3b4e"
-      (reference "SW4") (unit 2) (value "SW_DPDT_x2") (footprint "")
+      (reference "SW4") (unit 2) (value "SW_DPDT_x2") (footprint "SupersonicQuantumbox:Stomp_switch")
     )
     (path "/c3e1c4c6-64d8-4eb6-86eb-759cbb00d7a2"
       (reference "U1") (unit 1) (value "Input_jack") (footprint "SupersonicQuantumbox:MonoJack-SYS212")
