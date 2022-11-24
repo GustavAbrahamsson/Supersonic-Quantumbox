@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <NeoPixelBus.h>
+#include <ESP32Encoder.h>
 
+// Pins
 #define POT1 1
 #define POT2 2
 #define POT3 3
@@ -20,27 +22,35 @@
 #define DOUT 17
 #define LRCLK 18
 
-int pixelCount = 2;
+// Global variables
 
-//NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(pixelCount, PIXELPIN);
+// Neopixel
+int pixelCount = 2;
+NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(pixelCount, PIXELPIN);
+
+// Encoder
+ESP32Encoder encoder;
+
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  //strip.Begin();
-  //strip.Show();
+
+  // Initialize the strip
+  strip.Begin();
+  strip.Show();
+
+  // Initialize the encoder
+  encoder.attachHalfQuad(ENC_A, ENC_B);
+  encoder.clearCount();
+
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   // set whole strip to red
-  //strip.ClearTo(RgbColor(63, 0, 0));
-  Serial.println("Red");
-  //strip.Show();
-  delay(1000);
-  // set whole strip to green
-  //strip.ClearTo(RgbColor(0, 63, 0));
-  Serial.println("Green");
-  //strip.Show();
-  delay(1000);
+  int h = encoder.getCount();
+  strip.ClearTo(HslColor(h/100.0, 0, 1));
+  strip.Show();
+  delay(10);
 }
