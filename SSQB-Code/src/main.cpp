@@ -5,26 +5,32 @@
 #include "driver/gpio.h"
 
 // Pins
-#define POT1 1
-#define POT2 2
-#define POT3 3
-#define POT4 4
-#define PIXELPIN 5
-#define SCL 6
-#define SDA 7
-#define POT6 8
-#define POT5 9
-#define ENC_B 10
-#define ENC_A 11
-#define ENC_SW 12
-#define LED1 13
-#define LED2 14
-#define BCLK 15
-#define DIN 16
-#define DOUT 17
-#define LRCLK 18
+#define POT1      GPIO_NUM_1
+#define POT2      GPIO_NUM_2
+#define POT3      GPIO_NUM_3
+#define POT4      GPIO_NUM_4
+#define PIXELPIN  GPIO_NUM_5
+#define SCL       GPIO_NUM_6
+#define SDA       GPIO_NUM_7
+#define POT6      GPIO_NUM_8
+#define POT5      GPIO_NUM_9
+#define ENC_B     GPIO_NUM_10
+#define ENC_A     GPIO_NUM_11
+#define ENC_SW    GPIO_NUM_12
+#define LED1      GPIO_NUM_13
+#define LED2      GPIO_NUM_14
+#define BCLK      GPIO_NUM_15
+#define DIN       GPIO_NUM_16
+#define DOUT      GPIO_NUM_17
+#define LRCLK     GPIO_NUM_18
 
 // Global variables
+
+#define I2S_NUM   I2S_NUM_0
+#define BUFFSIZE  128
+
+int16_t i2s_write_buff[BUFFSIZE*2];
+uint32_t n = 0;
 
 // Neopixel
 int pixelCount = 2;
@@ -36,16 +42,15 @@ ESP32Encoder encoder;
 void install_i2s(){
   // I2S
   i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX), // Both TX and RX in master mode
+    .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_TX), // Both TX and RX in master mode
     .sample_rate = 48000,
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_24BIT,
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
     .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
-    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, // Interrupt level 1, default 0
-    .dma_buf_count = 2,
-    .dma_buf_len = 128,
+    .dma_buf_count = 4,
+    .dma_buf_len = BUFFSIZE,
     .use_apll = true,
-    .mclk_multiple = I2S_MCLK_MULTIPLE_256
+    .fixed_mclk = 12288000, 
   };
 
   i2s_pin_config_t pin_config = {
@@ -53,36 +58,62 @@ void install_i2s(){
     .bck_io_num = BCLK,
     .ws_io_num = LRCLK,
     .data_out_num = DOUT,
-    .data_in_num = DIN
+    .data_in_num = I2S_PIN_NO_CHANGE
   };
 
-  i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
-  i2s_set_pin(I2S_NUM_0, &pin_config);
+  esp_err_t e = i2s_driver_install(I2S_NUM, &i2s_config, 0, NULL);
+  if (e != ESP_OK) {
+    Serial.println("I2S driver install failed");
+  }
+  e = i2s_set_pin(I2S_NUM, &pin_config);
+  if (e != ESP_OK) {
+    Serial.println("I2S pin config failed");
+  }
+}
+
+void AudioTask(void *pvParameters){
+  uint32_t n = 0;
+  while(1){
+    
+  }
 }
 
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
+  Serial.setDebugOutput(true);
+  Serial.println("Starting up");
 
   // Initialize the strip
   strip.Begin();
   strip.Show();
+  Serial.println("Strip initialized");
 
   // Initialize the encoder
   encoder.attachHalfQuad(ENC_A, ENC_B);
   encoder.clearCount();
+  Serial.println("Encoder initialized");
 
   // Initialize I2S
   install_i2s();
+  Serial.println("I2S initialized");
+
+  // Start the audio task
+  //xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 1, NULL);
 
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  // set whole strip to red
-  int h = encoder.getCount();
-  strip.ClearTo(HslColor(h/100.0, 1, 0.5));
-  strip.Show();
-  delay(10);
+  // write sine wave to I2S
+
+  for (int i = 0; i < BUFFSIZE; i++) {
+    int16_t s = (int16_t) (32767.0 * sin(440.0 * 2 * PI * n / 48000.0));
+    i2s_write_buff[2*i] = s;
+    i2s_write_buff[2*i+1] = s;
+    n++;
+  }
+  size_t bytes_written;
+  ESP_ERROR_CHECK(i2s_write(I2S_NUM, (const char*) &i2s_write_buff, BUFFSIZE *2* sizeof(int16_t), &bytes_written, portMAX_DELAY));
+
 }
