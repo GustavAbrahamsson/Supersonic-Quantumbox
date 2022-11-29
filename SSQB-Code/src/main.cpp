@@ -2,7 +2,7 @@
 #include <NeoPixelBus.h>
 #include <ESP32Encoder.h>
 #include "driver/i2s.h"
-#include "driver/gpio.h"
+#include "dsps_fft2r.h"
 
 // Pins
 #define POT1      GPIO_NUM_1
@@ -30,7 +30,9 @@
 #define BUFFSIZE  128
 
 int16_t i2s_write_buff[BUFFSIZE*2];
+int16_t i2s_read_buff[BUFFSIZE*2];
 uint32_t n = 0;
+float avgDspTime = 0;
 
 // Neopixel
 int pixelCount = 2;
@@ -39,10 +41,28 @@ NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(pixelCount, PIXELPIN);
 // Encoder
 ESP32Encoder encoder;
 
+void DSP(int16_t * InBuff, int16_t * OutBuff, size_t length)
+{
+  // Here you can do your DSP stuff
+  // InBuff contains the input data
+  // OutBuff is the output buffer
+  // length is the number of frames
+  // A frame contains one left and one right sample
+
+  for (int i = 0; i < BUFFSIZE; i++)
+    {
+      int16_t s = 5000 * sin(440.0 * 2 * PI * n / 48000.0);
+      i2s_write_buff[i*2] = s;
+      i2s_write_buff[i*2+1] = s;
+      n++;
+    }
+}
+
+
 void install_i2s(){
   // I2S
   i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_TX), // Both TX and RX in master mode
+    .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX), // Both TX and RX in master mode
     .sample_rate = 48000,
     .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
     .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
@@ -58,7 +78,7 @@ void install_i2s(){
     .bck_io_num = BCLK,
     .ws_io_num = LRCLK,
     .data_out_num = DOUT,
-    .data_in_num = I2S_PIN_NO_CHANGE
+    .data_in_num = DIN
   };
 
   esp_err_t e = i2s_driver_install(I2S_NUM, &i2s_config, 0, NULL);
@@ -72,9 +92,29 @@ void install_i2s(){
 }
 
 void AudioTask(void *pvParameters){
+  
+  // Wait for input buffer to fill up
+  delay(1000);
+
   uint32_t n = 0;
   while(1){
+
+    // Read from I2S    
+    size_t bytes_written;
+    ESP_ERROR_CHECK(i2s_read(I2S_NUM, (char *) i2s_read_buff, BUFFSIZE*2, &bytes_written, portMAX_DELAY));
+    uint32_t startTime = micros();
+
+    // Send to DSP function
+    DSP(i2s_read_buff, i2s_write_buff, BUFFSIZE);
     
+    uint32_t DSPTime = micros() - startTime;
+    float DSPpct = DSPTime*(48000.0/(BUFFSIZE*1000000.0));
+
+    avgDspTime = (avgDspTime * 0.95) + (DSPpct * 0.05);
+
+    // Write to I2S
+    bytes_written;
+    ESP_ERROR_CHECK(i2s_write(I2S_NUM, (const char*) &i2s_write_buff, BUFFSIZE *2* sizeof(int16_t), &bytes_written, portMAX_DELAY));
   }
 }
 
@@ -100,20 +140,13 @@ void setup() {
   Serial.println("I2S initialized");
 
   // Start the audio task
-  //xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 1, NULL);
+  xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
 
 }
 
 void loop() {
   // write sine wave to I2S
-
-  for (int i = 0; i < BUFFSIZE; i++) {
-    int16_t s = (int16_t) (32767.0 * sin(440.0 * 2 * PI * n / 48000.0));
-    i2s_write_buff[2*i] = s;
-    i2s_write_buff[2*i+1] = s;
-    n++;
-  }
-  size_t bytes_written;
-  ESP_ERROR_CHECK(i2s_write(I2S_NUM, (const char*) &i2s_write_buff, BUFFSIZE *2* sizeof(int16_t), &bytes_written, portMAX_DELAY));
-
+  Serial.print("DSP CPU %: ");
+  Serial.println(avgDspTime, 4);
+  delay(5000);
 }
