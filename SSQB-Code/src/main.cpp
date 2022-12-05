@@ -29,8 +29,8 @@
 #define I2S_NUM   I2S_NUM_0
 #define BUFFSIZE  128
 
-int16_t i2s_write_buff[BUFFSIZE*2];
-int16_t i2s_read_buff[BUFFSIZE*2];
+int32_t i2s_write_buff[BUFFSIZE*2];
+int32_t i2s_read_buff[BUFFSIZE*2];
 uint32_t n = 0;
 float avgDspTime = 0;
 
@@ -41,7 +41,7 @@ NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(pixelCount, PIXELPIN);
 // Encoder
 ESP32Encoder encoder;
 
-void DSP(int16_t * InBuff, int16_t * OutBuff, size_t length)
+void DSP(int32_t * InBuff, int32_t * OutBuff, size_t length)
 {
   // Here you can do your DSP stuff
   // InBuff contains the input data
@@ -49,13 +49,22 @@ void DSP(int16_t * InBuff, int16_t * OutBuff, size_t length)
   // length is the number of frames
   // A frame contains one left and one right sample
 
+  // for (int i = 0; i < BUFFSIZE; i++)
+  // {
+  //   int32_t s = INT32_MAX/2 * sin(440.0 * 2 * PI * n / 48000.0);
+  //   i2s_write_buff[i*2] = s;
+  //   i2s_write_buff[i*2+1] = s;
+  //   n++;
+  // }
+
+
+  // passthrough
+
   for (int i = 0; i < BUFFSIZE; i++)
-    {
-      int16_t s = 5000 * sin(440.0 * 2 * PI * n / 48000.0);
-      i2s_write_buff[i*2] = s;
-      i2s_write_buff[i*2+1] = s;
-      n++;
-    }
+  {
+    i2s_write_buff[i*2] = i2s_read_buff[i*2];
+    i2s_write_buff[i*2+1] = i2s_read_buff[i*2+1];
+  }
 }
 
 
@@ -64,13 +73,13 @@ void install_i2s(){
   i2s_config_t i2s_config = {
     .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX), // Both TX and RX in master mode
     .sample_rate = 48000,
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
     .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
     .dma_buf_count = 4,
     .dma_buf_len = BUFFSIZE,
     .use_apll = true,
-    .fixed_mclk = 12288000, 
+    .mclk_multiple = I2S_MCLK_MULTIPLE_256,
   };
 
   i2s_pin_config_t pin_config = {
@@ -101,7 +110,7 @@ void AudioTask(void *pvParameters){
 
     // Read from I2S    
     size_t bytes_written;
-    ESP_ERROR_CHECK(i2s_read(I2S_NUM, (char *) i2s_read_buff, BUFFSIZE*2, &bytes_written, portMAX_DELAY));
+    ESP_ERROR_CHECK(i2s_read(I2S_NUM, (char *) i2s_read_buff, BUFFSIZE*2*sizeof(int32_t), &bytes_written, portMAX_DELAY));
     uint32_t startTime = micros();
 
     // Send to DSP function
@@ -114,7 +123,7 @@ void AudioTask(void *pvParameters){
 
     // Write to I2S
     bytes_written;
-    ESP_ERROR_CHECK(i2s_write(I2S_NUM, (const char*) &i2s_write_buff, BUFFSIZE *2* sizeof(int16_t), &bytes_written, portMAX_DELAY));
+    ESP_ERROR_CHECK(i2s_write(I2S_NUM, (const char*) &i2s_write_buff, BUFFSIZE *2* sizeof(int32_t), &bytes_written, portMAX_DELAY));
   }
 }
 
