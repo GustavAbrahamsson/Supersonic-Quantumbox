@@ -1,5 +1,8 @@
 # Supersonic-Quantumbox
 
+- Adam Anderson, main contributor (https://github.com/adaand00)
+- Gustav Abrahamsson
+
 Multi-use digital guitar pedal
 
 WIP:
