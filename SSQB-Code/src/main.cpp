@@ -71,6 +71,13 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
   Adafruit_SSD1306 display(128, 64, &OledWire, -1);
 #endif
 
+// LED filaments
+#ifdef USE_LEDS
+  int ledBrightness[] = {0, 0};
+#endif
+
+// --------------Functions--------------------
+
 void DSP(int32_t * InBuff, int32_t * OutBuff, size_t length)
 {
   // Here you can do your DSP stuff
@@ -188,6 +195,12 @@ void PeripheralTask(void *pvParameters){
       display.display();
     #endif
 
+    //write to LED filaments
+    #ifdef USE_LEDS
+      ledcWrite(0, pots[0]>>4);
+      ledcWrite(1, pots[1]>>4);
+    #endif
+
     // delay
     delay(50);
   }
@@ -233,6 +246,20 @@ void setup() {
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, true);
     display.clearDisplay();
     Serial.println("OLED initialized");
+  #endif
+
+  // Initialize LED filament
+  #ifdef USE_LEDS
+    pinMode(LED1, OUTPUT);
+    ledcAttachPin(LED1, 0);
+    ledcSetup(0, 1000, 8);
+    ledcWrite(0, 0);
+
+    pinMode(LED2, OUTPUT);
+    ledcAttachPin(LED2, 1);
+    ledcSetup(1, 1000, 8);
+    ledcWrite(1, 0);
+    Serial.println("LED initialized");
   #endif
 
   // Start the audio task
