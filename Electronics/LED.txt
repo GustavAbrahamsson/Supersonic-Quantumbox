@@ -1,0 +1,10 @@
+BLUE: 3.3V 120 mA max
+2.65V gives 17 mA
+3.3 - 2.65 = 0.65 V
+
+R = 0.65 / 0.017 = (38.23...) \approx 40 Ohm
+
+
+
+PINK: 3.3V 120 mA max
+Same as blue, 40 Ohm

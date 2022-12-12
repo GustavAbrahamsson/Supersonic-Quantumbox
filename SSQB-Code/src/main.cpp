@@ -11,11 +11,11 @@
 
 #define USE_OLED
 #define USE_ENCODER
-#define USE_PIXELS
+//#define USE_PIXELS
 #define USE_LEDS
 
 // Set to true to enable pot
-bool POTS_ENABLED[6] = {true, true, true, false, false, false};
+bool POTS_ENABLED[6] = {true, true, true, true, false, true};
 
 // ----------------Pins-----------------------
 #define POT1      GPIO_NUM_1

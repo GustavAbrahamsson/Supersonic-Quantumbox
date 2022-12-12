@@ -1,0 +1,5 @@
+
+* Fix 38 mm LED footprint
+* Pushbuttons and USB port behind lid?
+* ADC ports reading potentiometer values is weird around max value, add resistor in series?
+* Add port that reads whether the stomp switch is on/off
