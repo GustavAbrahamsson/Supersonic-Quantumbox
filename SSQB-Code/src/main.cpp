@@ -5,14 +5,15 @@
 #include "dsps_fft2r.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
+#include "AudioBuffer.h"
 
 // --------------CONFIG-----------------------
 // comment out to disable
 
 #define USE_OLED
 #define USE_ENCODER
-//#define USE_PIXELS
-#define USE_LEDS
+#define USE_PIXELS
+//#define USE_LEDS
 
 // Set to true to enable pot
 bool POTS_ENABLED[6] = {true, true, true, true, false, true};
@@ -78,32 +79,27 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
 
 // --------------Functions--------------------
 
-void DSP(int32_t * InBuff, int32_t * OutBuff, size_t length)
-{
-  // Here you can do your DSP stuff
-  // InBuff: input data
-  // OutBuff: output buffer
-  // length: the number of frames in input data, should also be the number of frames in output data
-  // A frame contains one left and one right sample
+// Here you can do your DSP stuff for a single sample
+//
+// inputBuffer: input buffer
+// outputBuffer: output buffer
+// return: sample to play
+//
+// Buffer->read(0) returns the most recent sample
+// Buffer->read(1) returns the sample before that
+//
+// Global variables and functions that are available:
+// input peripherals: encoder, pots 
+// output peripherals: pixels, oled, leds
+// millis() for time in ms
+int32_t DSP(AudioBuffer<int32_t> * inputBuffer, AudioBuffer<int32_t> * outputBuffer){
 
-  // for (int i = 0; i < length; i++)
-  // {
-  //   int32_t s = INT32_MAX/2 * sin(440.0 * 2 * PI * n / 48000.0);
-  //   i2s_write_buff[i*2] = s;
-  //   i2s_write_buff[i*2+1] = s;
-  //   n++;
-  // }
-
+  // sine wave with 440Hz
+  //return (uint32_t)10000 * sin((millis() * 2 * PI * 440.0) / 1000.0);
 
   // passthrough
-
-  for (int i = 0; i < length; i++)
-  {
-    i2s_write_buff[i*2] = i2s_read_buff[i*2];
-    i2s_write_buff[i*2+1] = i2s_read_buff[i*2+1];
-  }
+  return inputBuffer->read(0);
 }
-
 
 void install_i2s(){
   // I2S
@@ -132,7 +128,11 @@ void install_i2s(){
 }
 
 void AudioTask(void *pvParameters){
-  
+
+  // create input and output buffer for DSP function
+  AudioBuffer<int32_t> inputBuffer = AudioBuffer<int32_t>(1024);
+  AudioBuffer<int32_t> outputBuffer = AudioBuffer<int32_t>(128);
+
   // Wait for input buffer to fill up
   delay(1000);
 
@@ -144,9 +144,23 @@ void AudioTask(void *pvParameters){
     ESP_ERROR_CHECK(i2s_read(I2S_NUM, (char *) i2s_read_buff, BUFFSIZE*2*sizeof(int32_t), &bytes_written, portMAX_DELAY));
     uint32_t startTime = micros();
 
-    // Send to DSP function
-    DSP(i2s_read_buff, i2s_write_buff, BUFFSIZE);
-    
+    // Send to a chunk to DSP function, one sample at a time
+    for (int i = 0; i < BUFFSIZE; i++)
+    {
+      //Save current sample
+      inputBuffer.write(i2s_read_buff[i * 2]); 
+
+      // Call DSP function for modified sample
+      uint32_t s = DSP(&inputBuffer, &outputBuffer);
+
+      //Write sample to output buffer
+      outputBuffer.write(s);
+
+      //Write sample to I2S buffer
+      i2s_write_buff[i * 2] = s;
+      i2s_write_buff[i * 2 + 1] = s;
+    }
+
     // Calculate DSP time
     uint32_t DSPTime = micros() - startTime;
     float DSPpct = DSPTime*(48000.0/(BUFFSIZE*1000000.0));
@@ -263,6 +277,9 @@ void setup() {
   #endif
 
   // Start the audio task
+  psramInit();
+  Serial.println("PSRAM initialized");
+  Serial.println(ESP.getPsramSize());
   xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
   
   // Start input task
