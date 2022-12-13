@@ -89,13 +89,14 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
 // Buffer->read(1) returns the sample before that
 //
 // Global variables and functions that are available:
-// input peripherals: encoder, pots 
-// output peripherals: pixels, oled, leds
+// input peripherals: encoderCount, encoderButton, pots[] 
+// output peripherals: pixels, oled, leds (no global variables for these yet)
 // millis() for time in ms
+// n for sample number
 int32_t DSP(AudioBuffer<int32_t> * inputBuffer, AudioBuffer<int32_t> * outputBuffer){
 
   // sine wave with 440Hz
-  //return (uint32_t)10000 * sin((millis() * 2 * PI * 440.0) / 1000.0);
+  //return (uint32_t)10000 * sin((n * 2 * PI * 440.0) / 48000.0);
 
   // passthrough
   return inputBuffer->read(0);
@@ -152,6 +153,9 @@ void AudioTask(void *pvParameters){
 
       // Call DSP function for modified sample
       uint32_t s = DSP(&inputBuffer, &outputBuffer);
+
+      // increment sample number
+      n++;
 
       //Write sample to output buffer
       outputBuffer.write(s);
