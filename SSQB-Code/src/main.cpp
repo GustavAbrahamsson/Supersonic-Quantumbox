@@ -230,7 +230,7 @@ void PeripheralTask(void *pvParameters){
       display.println("Button: " + String(encoderButton));
       display.println("Pots: " + String(pots[0]) + " " + String(pots[1]) + " " + String(pots[2]));
       display.println("DSP %: " + String(avgDspTime));
-      display.println("PSRAM used: " + String(ESP.getFreePsram()) +  " / " + String(ESP.getPsramSize()));
+      display.println("PSRAM used: " + String(ESP.getPsramSize() - ESP.getFreePsram()) +  " / " + String(ESP.getPsramSize()));
       display.display();
     #endif
 
