@@ -13,10 +13,10 @@
 #define USE_OLED
 #define USE_ENCODER
 #define USE_PIXELS
-//#define USE_LEDS
+#define USE_LEDS
 
 // Set to true to enable pot
-bool POTS_ENABLED[6] = {true, true, true, true, false, true};
+bool POTS_ENABLED[6] = {true, true, true, false, false, true};
 
 // ----------------Pins-----------------------
 #define POT1      GPIO_NUM_1
@@ -41,6 +41,9 @@ bool POTS_ENABLED[6] = {true, true, true, true, false, true};
 // ----------Global variables-----------------
 
 // DSP variables
+#define INT24_MAX 1<<(24)-1
+uint32_t maxSignal;
+
 #define I2S_NUM   I2S_NUM_0
 #define BUFFSIZE  128
 
@@ -52,6 +55,7 @@ float avgDspTime = 0;
 // Neopixel
 #ifdef USE_PIXELS
   int pixelCount = 2;
+  RgbColor pixelColors[] = {RgbColor(0,0,0), RgbColor(0,0,0)};
   NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(pixelCount, PIXELPIN);
 #endif
 
@@ -90,7 +94,7 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
 //
 // Global variables and functions that are available:
 // input peripherals: encoderCount, encoderButton, pots[] 
-// output peripherals: pixels, oled, leds (no global variables for these yet)
+// output peripherals: ledBrightness[], pixelColors[] 
 // millis() for time in ms
 // n for sample number
 int32_t DSP(AudioBuffer<int32_t> * inputBuffer, AudioBuffer<int32_t> * outputBuffer){
@@ -98,8 +102,24 @@ int32_t DSP(AudioBuffer<int32_t> * inputBuffer, AudioBuffer<int32_t> * outputBuf
   // sine wave with 440Hz
   //return (uint32_t)10000 * sin((n * 2 * PI * 440.0) / 48000.0);
 
+  // Clip me baby!
+  int32_t in = inputBuffer->read(0);
+  int32_t clip = ((int32_t) pots[0])*(INT24_MAX/8192); 
+
+  if(in > maxSignal)
+    maxSignal = in;
+
+  if(in > clip){
+    return clip;
+  }
+  if(in < -clip){
+    return -clip;
+  }
+
+  return in;
+
   // passthrough
-  return inputBuffer->read(0);
+  // return inputBuffer->read(0);
 }
 
 void install_i2s(){
@@ -195,8 +215,8 @@ void PeripheralTask(void *pvParameters){
 
     // write to neopixels
     #ifdef USE_PIXELS
-      strip.SetPixelColor(0, RgbColor(pots[0]>>4, pots[1]>>4, pots[2]>>4));
-      strip.SetPixelColor(1, RgbColor(pots[0]>>4, pots[1]>>4, pots[2]>>4));
+      strip.SetPixelColor(0, pixelColors[0]);
+      strip.SetPixelColor(1, pixelColors[1]);
       strip.Show();
     #endif
 
@@ -209,14 +229,15 @@ void PeripheralTask(void *pvParameters){
       display.println("Encoder: " + String(encoderCount));
       display.println("Button: " + String(encoderButton));
       display.println("Pots: " + String(pots[0]) + " " + String(pots[1]) + " " + String(pots[2]));
-      display.println("DSP: " + String(avgDspTime));
+      display.println("DSP %: " + String(avgDspTime));
+      display.println("PSRAM used: " + String(ESP.getFreePsram()) +  " / " + String(ESP.getPsramSize()));
       display.display();
     #endif
 
     //write to LED filaments
     #ifdef USE_LEDS
-      ledcWrite(0, pots[0]>>4);
-      ledcWrite(1, pots[1]>>4);
+      ledcWrite(0, ledBrightness[0]);
+      ledcWrite(1, ledBrightness[1]);
     #endif
 
     // delay
