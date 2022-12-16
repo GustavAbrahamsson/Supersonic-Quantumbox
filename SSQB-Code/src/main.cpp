@@ -5,7 +5,8 @@
 #include "dsps_fft2r.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
-#include "AudioBuffer.h"
+#include <AudioBuffer.h>
+#include <GenericEffect.h>
 
 // --------------CONFIG-----------------------
 // comment out to disable

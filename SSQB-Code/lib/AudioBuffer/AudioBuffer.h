@@ -2,6 +2,9 @@
 // Overwrites oldest data when buffer is full
 // stores data in PSRAM
 
+#ifndef AudioBuffer_h
+#define AudioBuffer_h
+
 #include <Arduino.h>
 
 template <typename T>
@@ -40,3 +43,5 @@ public:
         return buffer[i];
     };
 };
+
+#endif
