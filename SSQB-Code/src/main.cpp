@@ -7,6 +7,8 @@
 #include "Adafruit_SSD1306.h"
 #include <AudioBuffer.h>
 #include <GenericEffect.h>
+#include <Clip.h>
+#include <Fonts/Picopixel.h>
 
 // --------------CONFIG-----------------------
 // comment out to disable
@@ -18,6 +20,10 @@
 
 // Set to true to enable pot
 bool POTS_ENABLED[6] = {true, true, true, false, false, true};
+
+// Should not exceed 10 seconds total
+#define INPUT_BUFFER_MS 1000
+#define OUTPUT_BUFFER_MS 5000
 
 // ----------------Pins-----------------------
 #define POT1      GPIO_NUM_1
@@ -40,6 +46,12 @@ bool POTS_ENABLED[6] = {true, true, true, false, false, true};
 #define LRCLK     GPIO_NUM_18
 
 // ----------Global variables-----------------
+
+// Effects
+Clip clip;
+
+GenericEffect * effects[] = {&clip};
+uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
 // DSP variables
 #define INT24_MAX 1<<(24)-1
@@ -103,21 +115,11 @@ int32_t DSP(AudioBuffer<int32_t> * inputBuffer, AudioBuffer<int32_t> * outputBuf
   // sine wave with 440Hz
   //return (uint32_t)10000 * sin((n * 2 * PI * 440.0) / 48000.0);
 
-  // Clip me baby!
-  int32_t in = inputBuffer->read(0);
-  int32_t clip = ((int32_t) pots[0])*(INT24_MAX/8192); 
-
-  if(in > maxSignal)
-    maxSignal = in;
-
-  if(in > clip){
-    return clip;
-  }
-  if(in < -clip){
-    return -clip;
-  }
-
-  return in;
+  // input
+  int32_t s = inputBuffer->read(0);
+  
+  // Clip
+  return effects[0]->DSP(inputBuffer, outputBuffer);
 
   // passthrough
   // return inputBuffer->read(0);
@@ -152,8 +154,8 @@ void install_i2s(){
 void AudioTask(void *pvParameters){
 
   // create input and output buffer for DSP function
-  AudioBuffer<int32_t> inputBuffer = AudioBuffer<int32_t>(1024);
-  AudioBuffer<int32_t> outputBuffer = AudioBuffer<int32_t>(128);
+  AudioBuffer<int32_t> inputBuffer = AudioBuffer<int32_t>(INPUT_BUFFER_MS * 48000 / 1000);
+  AudioBuffer<int32_t> outputBuffer = AudioBuffer<int32_t>(OUTPUT_BUFFER_MS * 48000 / 1000);
 
   // Wait for input buffer to fill up
   delay(1000);
@@ -198,21 +200,16 @@ void AudioTask(void *pvParameters){
 }
 
 void PeripheralTask(void *pvParameters){
+
+  uint32_t maxRam = ESP.getPsramSize();
+
   while(1){
 
     // Read encoder
     #ifdef USE_ENCODER
-      encoderCount = encoder.getCount();
-      encoderButton = ~digitalRead(ENC_SW);
+      encoderCount = encoder.getCount()/2;
+      encoderButton = !digitalRead(ENC_SW);
     #endif
-
-    // Read pots
-    for (int i = 0; i < 6; i++)
-    {
-      if(POTS_ENABLED[i]){
-        pots[i] = analogRead(potPins[i]);
-      }
-    }
 
     // write to neopixels
     #ifdef USE_PIXELS
@@ -224,14 +221,14 @@ void PeripheralTask(void *pvParameters){
     // write to OLED
     #ifdef USE_OLED
       display.clearDisplay();
-      display.setCursor(0,0);
-      display.setTextSize(1);
-      display.setTextColor(WHITE);
+      display.setCursor(0,6);
+      display.setFont(&Picopixel);
+      display.setTextColor(1);
       display.println("Encoder: " + String(encoderCount));
       display.println("Button: " + String(encoderButton));
-      display.println("Pots: " + String(pots[0]) + " " + String(pots[1]) + " " + String(pots[2]));
+      display.println("Pots: " + String(pots[0]) + ", " + String(pots[1]) + ", " + String(pots[2]));
       display.println("DSP %: " + String(avgDspTime));
-      display.println("PSRAM used: " + String(ESP.getPsramSize() - ESP.getFreePsram()) +  " / " + String(ESP.getPsramSize()));
+      display.println("PSRAM used: " + String(maxRam - ESP.getFreePsram()) +  " / " + String(maxRam));
       display.display();
     #endif
 
@@ -246,6 +243,18 @@ void PeripheralTask(void *pvParameters){
   }
 }
 
+void potLoop(void *pvParameters){
+  // FIR filter for smoothing pots
+  while(1){
+    for (int i = 0; i < 6; i++)
+    {
+      if(POTS_ENABLED[i]){
+        pots[i] = (pots[i]*63 + analogRead(potPins[i]))/64;
+      }
+    }
+    delay(1);
+  }
+}
 
 void setup() {
   // put your setup code here, to run once:
@@ -273,12 +282,15 @@ void setup() {
   Serial.println("I2S initialized");
 
   // Initialize the pots
+  analogSetAttenuation(ADC_11db);
   for (int i = 0; i < 6; i++)
   {
     if(POTS_ENABLED[i]){
       pinMode(potPins[i], INPUT);
+      pots[i] = analogRead(potPins[i]);
     }
   }
+  Serial.println("Pots initialized");
 
   // Initialize OLED
   #ifdef USE_OLED
@@ -305,12 +317,17 @@ void setup() {
   // Start the audio task
   psramInit();
   Serial.println("PSRAM initialized");
-  Serial.println(ESP.getPsramSize());
-  xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
-  
-  // Start input task
-  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 1, NULL);
 
+  // Start audio task
+  xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
+  Serial.println("AudioTask started");
+  
+  // Start peripheral task
+  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 2, NULL);
+  Serial.println("PeripheralTask started");
+
+  // Start pot task
+  xTaskCreate(potLoop, "potLoop", 1000, NULL, 1, NULL);
 }
 
 void loop() {
