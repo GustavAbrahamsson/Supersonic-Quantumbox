@@ -9,14 +9,14 @@
 class GenericEffect{
     public:
         // DSP function
-        virtual int32_t DSP(AudioBuffer<int32_t> * input, AudioBuffer<int32_t> * output) = 0;
+        virtual int32_t DSP(int32_t sample) = 0;
         
+        // Draw function
         virtual void Draw(Adafruit_SSD1306 * display) = 0;
 
         // Name of effect
         virtual String getName() = 0;
 
-        
         // number of parameters
         virtual uint32_t getNumInputs() = 0;
 

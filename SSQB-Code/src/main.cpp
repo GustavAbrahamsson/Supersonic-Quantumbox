@@ -5,10 +5,13 @@
 #include "dsps_fft2r.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
+#include <Fonts/Picopixel.h>
 #include <AudioBuffer.h>
 #include <GenericEffect.h>
 #include <Clip.h>
-#include <Fonts/Picopixel.h>
+#include <maxSample.h>
+#include <DelayEffect.h>
+
 
 // --------------CONFIG-----------------------
 // comment out to disable
@@ -20,10 +23,6 @@
 
 // Set to true to enable pot
 bool POTS_ENABLED[6] = {true, true, true, false, false, true};
-
-// Should not exceed 10 seconds total
-#define INPUT_BUFFER_MS 1000
-#define OUTPUT_BUFFER_MS 5000
 
 // ----------------Pins-----------------------
 #define POT1      GPIO_NUM_1
@@ -48,15 +47,14 @@ bool POTS_ENABLED[6] = {true, true, true, false, false, true};
 // ----------Global variables-----------------
 
 // Effects
+MaxSample maxSample;
 Clip clip;
+DelayEffect delayEffect;
 
-GenericEffect * effects[] = {&clip};
-uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
+GenericEffect * effects[] = {&maxSample, &clip, &delayEffect};
+const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
 // DSP variables
-#define INT24_MAX 1<<(24)-1
-uint32_t maxSignal;
-
 #define I2S_NUM   I2S_NUM_0
 #define BUFFSIZE  128
 
@@ -96,35 +94,6 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
 
 // --------------Functions--------------------
 
-// Here you can do your DSP stuff for a single sample
-//
-// inputBuffer: input buffer
-// outputBuffer: output buffer
-// return: sample to play
-//
-// Buffer->read(0) returns the most recent sample
-// Buffer->read(1) returns the sample before that
-//
-// Global variables and functions that are available:
-// input peripherals: encoderCount, encoderButton, pots[] 
-// output peripherals: ledBrightness[], pixelColors[] 
-// millis() for time in ms
-// n for sample number
-int32_t DSP(AudioBuffer<int32_t> * inputBuffer, AudioBuffer<int32_t> * outputBuffer){
-
-  // sine wave with 440Hz
-  //return (uint32_t)10000 * sin((n * 2 * PI * 440.0) / 48000.0);
-
-  // input
-  int32_t s = inputBuffer->read(0);
-  
-  // Clip
-  return effects[0]->DSP(inputBuffer, outputBuffer);
-
-  // passthrough
-  // return inputBuffer->read(0);
-}
-
 void install_i2s(){
   // I2S
   i2s_config_t i2s_config = {
@@ -153,17 +122,13 @@ void install_i2s(){
 
 void AudioTask(void *pvParameters){
 
-  // create input and output buffer for DSP function
-  AudioBuffer<int32_t> inputBuffer = AudioBuffer<int32_t>(INPUT_BUFFER_MS * 48000 / 1000);
-  AudioBuffer<int32_t> outputBuffer = AudioBuffer<int32_t>(OUTPUT_BUFFER_MS * 48000 / 1000);
-
   // Wait for input buffer to fill up
   delay(1000);
 
   uint32_t n = 0;
   while(1){
 
-    // Read from I2S    
+    // Read from I2S
     size_t bytes_written;
     ESP_ERROR_CHECK(i2s_read(I2S_NUM, (char *) i2s_read_buff, BUFFSIZE*2*sizeof(int32_t), &bytes_written, portMAX_DELAY));
     uint32_t startTime = micros();
@@ -172,16 +137,16 @@ void AudioTask(void *pvParameters){
     for (int i = 0; i < BUFFSIZE; i++)
     {
       //Save current sample
-      inputBuffer.write(i2s_read_buff[i * 2]); 
+      int32_t s = i2s_read_buff[i * 2];
 
       // Call DSP function for modified sample
-      uint32_t s = DSP(&inputBuffer, &outputBuffer);
+      for (int e = 0; e < numEffects; e++)
+      {
+        s = effects[e]->DSP(s);
+      }
 
       // increment sample number
       n++;
-
-      //Write sample to output buffer
-      outputBuffer.write(s);
 
       //Write sample to I2S buffer
       i2s_write_buff[i * 2] = s;
@@ -202,8 +167,13 @@ void AudioTask(void *pvParameters){
 void PeripheralTask(void *pvParameters){
 
   uint32_t maxRam = ESP.getPsramSize();
+  int32_t menuPage = 0;
 
   while(1){
+
+    effects[2]->setInputValue(0, pots[0]);
+    effects[2]->setInputValue(1, pots[1]);
+    effects[2]->setInputValue(2, pots[2]);
 
     // Read encoder
     #ifdef USE_ENCODER
@@ -221,14 +191,37 @@ void PeripheralTask(void *pvParameters){
     // write to OLED
     #ifdef USE_OLED
       display.clearDisplay();
-      display.setCursor(0,6);
-      display.setFont(&Picopixel);
-      display.setTextColor(1);
-      display.println("Encoder: " + String(encoderCount));
-      display.println("Button: " + String(encoderButton));
-      display.println("Pots: " + String(pots[0]) + ", " + String(pots[1]) + ", " + String(pots[2]));
-      display.println("DSP %: " + String(avgDspTime));
-      display.println("PSRAM used: " + String(maxRam - ESP.getFreePsram()) +  " / " + String(maxRam));
+      display.setFont(NULL);
+
+      if(encoderCount <= -1)
+        menuPage = -1;
+      else if(encoderCount > numEffects-1)
+        menuPage = numEffects-1;
+      else
+        menuPage = encoderCount;
+
+      // Menu
+      if(menuPage == -1){
+        // diagnostics display
+        display.setCursor(0,0);
+        display.println("Diagnostics");
+        display.drawFastHLine(0, 10, 128, 1);
+        display.setFont(&Picopixel);
+        display.setCursor(0, 20);
+        display.println("Encoder: " + String(encoderCount));
+        display.println("Button: " + String(encoderButton));
+        display.println("Pots: " + String(pots[0]) + ", " + String(pots[1]) + ", " + String(pots[2]));
+        display.println("DSP %: " + String(avgDspTime));
+        display.println("PSRAM used: " + String(maxRam - ESP.getFreePsram()) + " / " + String(maxRam));
+      }else{
+        effects[menuPage]->Draw(&display);
+        display.setCursor(0, 0);
+        display.println(effects[menuPage]->getName());
+        display.drawFastHLine(0, 10, 128, 1);
+        display.setFont(&Picopixel);
+        display.setCursor(0, 20);
+      }
+      
       display.display();
     #endif
 
@@ -239,7 +232,7 @@ void PeripheralTask(void *pvParameters){
     #endif
 
     // delay
-    delay(50);
+    delay(100);
   }
 }
 
@@ -297,6 +290,8 @@ void setup() {
     OledWire.setPins(SDA, SCL);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, true);
     display.clearDisplay();
+    display.setTextColor(1);
+    display.display();
     Serial.println("OLED initialized");
   #endif
 
@@ -317,7 +312,9 @@ void setup() {
   // Start the audio task
   psramInit();
   Serial.println("PSRAM initialized");
-
+  delayEffect.init();
+  
+  delay(3000);
   // Start audio task
   xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
   Serial.println("AudioTask started");

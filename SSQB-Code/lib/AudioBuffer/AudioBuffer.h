@@ -12,18 +12,19 @@ class AudioBuffer
 {
 private:
     T * buffer;
-    uint32_t head;
-    uint32_t tail;
-    uint32_t size;
+    uint32_t head = 0;
+    uint32_t size = 0;
 
 public:
     // constructor
-    AudioBuffer(uint32_t size){
+    AudioBuffer(){
+    };
+
+    void init(uint32_t size){
         buffer = (T *)ps_malloc(size * sizeof(T));
         this->size = size;
         head = 0;
-        tail = 0;
-    };
+    }
 
     // destructor
     ~AudioBuffer(){
@@ -32,15 +33,23 @@ public:
 
     // write data to buffer
     void write(T data){
+        head++;
         buffer[head] = data;
-        head = (head + 1) % size;
+        if (head >= size){
+            head = 0;
+        }
     };
 
     // read data from buffer
     // index: number of samples back
     T read(uint32_t index){
-        uint32_t i = (head - index) % size;
-        return buffer[i];
+        if (index >= size){
+            return 0;
+        }else if(index >= head){
+            return(buffer[size + head - index]);
+        }else{
+            return(buffer[head - index]);
+        } 
     };
 };
 

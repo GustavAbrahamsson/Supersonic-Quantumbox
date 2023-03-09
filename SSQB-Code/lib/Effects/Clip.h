@@ -3,32 +3,28 @@
 class Clip : public GenericEffect{
     private:
         String name = "Clip";
-        uint32_t InputValues[1] = {0};
+        uint32_t InputValues[1] = {4500};
 
     public:
 
-        int32_t DSP(AudioBuffer<int32_t> * input, AudioBuffer<int32_t> * output){
+        int32_t DSP(int32_t sample){
             // Clip me baby!
-            int32_t in = input->read(0);
-            int32_t clip = ((int32_t) InputValues[0])*((1<<24)/8192); 
+            int32_t clip = ((int32_t) InputValues[0])*((INT32_MAX)/1024); 
         
-            if(in > clip){
+            if(sample > clip){
                 return clip;
             }
-            if(in < -clip){
+            if(sample < -clip){
                 return -clip;
             }
         
-            return in;
+            return sample;
         }
 
         void Draw(Adafruit_SSD1306 * display){
-            display->clearDisplay();
             display->setCursor(0,30);
-            display->println(name);
             display->print("Level: ");
             display->println(InputValues[0]);
-            display->display();
         }
 
         String getName(){
