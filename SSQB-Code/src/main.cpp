@@ -11,6 +11,7 @@
 #include <Clip.h>
 #include <maxSample.h>
 #include <DelayEffect.h>
+#include <Saturation.h>
 
 
 // --------------CONFIG-----------------------
@@ -50,8 +51,9 @@ bool POTS_ENABLED[6] = {true, true, true, false, false, true};
 MaxSample maxSample;
 Clip clip;
 DelayEffect delayEffect;
+Saturation saturationEffect;
 
-GenericEffect * effects[] = {&maxSample, &clip, &delayEffect};
+GenericEffect * effects[] = {&maxSample, &clip, &delayEffect, &saturationEffect};
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
 // DSP variables
@@ -174,6 +176,11 @@ void PeripheralTask(void *pvParameters){
     effects[2]->setInputValue(0, pots[0]);
     effects[2]->setInputValue(1, pots[1]);
     effects[2]->setInputValue(2, pots[2]);
+    
+    effects[3]->setInputValue(0, pots[1]);
+    effects[3]->setInputValue(1, pots[0]);
+    effects[3]->setInputValue(2, pots[2]);
+    effects[3]->setInputValue(3, pots[3]);
 
     // Read encoder
     #ifdef USE_ENCODER
@@ -217,7 +224,9 @@ void PeripheralTask(void *pvParameters){
         effects[menuPage]->Draw(&display);
         display.setCursor(0, 0);
         display.println(effects[menuPage]->getName());
-        display.drawFastHLine(0, 10, 128, 1);
+        if(effects[menuPage]->getName() != "Saturation"){
+            display.drawFastHLine(0, 10, 128, 1);
+        }
         display.setFont(&Picopixel);
         display.setCursor(0, 20);
       }
