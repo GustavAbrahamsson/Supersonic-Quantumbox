@@ -51,13 +51,13 @@ bool POTS_ENABLED[6] = {true, true, true, false, false, true};
 // Effects
 Meter MaxInputMeter;
 Clip outputClip;
-//DelayEffect delayEffect;
+DelayEffect delayEffect;
 Meter maxOutputMeter;
 Saturation saturationEffect;
 
 GenericEffect * effects[] = {
   &MaxInputMeter, 
-  &saturationEffect, 
+  &delayEffect,
   &maxOutputMeter, 
   &outputClip
   };
@@ -189,9 +189,8 @@ void PeripheralTask(void *pvParameters){
     //effects[2]->setInputValue(1, pots[1]);
     //effects[2]->setInputValue(2, pots[2]);
     
-    saturationEffect.setInputValue(0, pots[0]);
-    saturationEffect.setInputValue(1, pots[1]);
-    saturationEffect.setInputValue(2, pots[2]);
+    delayEffect.setInputValue(0, pots[0]);
+    delayEffect.setInputValue(1, pots[1]);
 
     // Read encoder
     #ifdef USE_ENCODER
@@ -332,7 +331,7 @@ void setup() {
   // Start the audio task
   psramInit();
   Serial.println("PSRAM initialized");
-  //delayEffect.init();
+  delayEffect.init();
   
   delay(3000);
   // Start audio task

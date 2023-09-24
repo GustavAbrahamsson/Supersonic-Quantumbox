@@ -24,6 +24,11 @@ public:
         buffer = (T *)ps_malloc(size * sizeof(T));
         this->size = size;
         head = 0;
+        
+        // clear buffer
+        for (uint32_t i = 0; i < size; i++){
+            buffer[i] = 0;
+        }
     }
 
     // destructor

@@ -25,7 +25,7 @@ class Clip : public GenericEffect{
         void Draw(Adafruit_SSD1306 * display){
             display->setCursor(0,30);
             display->print("Level: ");
-            display->println(InputValues[0]*100.0f);
+            display->print(InputValues[0]*100.0f);
             display->println("%");
         }
 
