@@ -1,6 +1,7 @@
 #include "GenericEffect.h"
 
-class MaxSample : public GenericEffect
+// Volume meter, displays max with decay.
+class Meter : public GenericEffect
 {
 private:
     String name = "Level Meter";
@@ -15,7 +16,7 @@ public:
         {
             max = sample;
         }else{
-            max -= max*0.0001f; // set decay rate
+            max -= max*0.001f; // set decay rate
         }
 
         return sample;
@@ -37,7 +38,7 @@ public:
 
         display->setCursor(80, 30);
         display->print(pct);
-        display->print(" %");
+        display->print("%");
     }
 
     String getName()

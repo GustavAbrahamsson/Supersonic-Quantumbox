@@ -9,9 +9,10 @@
 #include <AudioBuffer.h>
 #include <GenericEffect.h>
 #include <Clip.h>
-#include <maxSample.h>
+#include <Meter.h>
 #include <DelayEffect.h>
 #include <Saturation.h>
+#include <Gain.h>
 
 
 // --------------CONFIG-----------------------
@@ -48,13 +49,19 @@ bool POTS_ENABLED[6] = {true, true, true, false, false, true};
 // ----------Global variables-----------------
 
 // Effects
-MaxSample MaxInputMeter;
-//Clip clip;
+Meter MaxInputMeter;
+Clip outputClip;
 //DelayEffect delayEffect;
-MaxSample maxOutputMeter;
+Meter maxOutputMeter;
 Saturation saturationEffect;
 
-GenericEffect * effects[] = {&MaxInputMeter, &saturationEffect, &maxOutputMeter};
+GenericEffect * effects[] = {
+  &MaxInputMeter, 
+  &saturationEffect, 
+  &maxOutputMeter, 
+  &outputClip
+  };
+
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
 // DSP variables
@@ -182,9 +189,9 @@ void PeripheralTask(void *pvParameters){
     //effects[2]->setInputValue(1, pots[1]);
     //effects[2]->setInputValue(2, pots[2]);
     
-    effects[1]->setInputValue(0, pots[0]);
-    effects[1]->setInputValue(1, pots[1]);
-    effects[1]->setInputValue(2, pots[2]);
+    saturationEffect.setInputValue(0, pots[0]);
+    saturationEffect.setInputValue(1, pots[1]);
+    saturationEffect.setInputValue(2, pots[2]);
 
     // Read encoder
     #ifdef USE_ENCODER
@@ -222,7 +229,7 @@ void PeripheralTask(void *pvParameters){
         display.println("Encoder: " + String(encoderCount));
         display.println("Button: " + String(encoderButton));
         display.println("Pots: " + String(pots[0]) + ", " + String(pots[1]) + ", " + String(pots[2]));
-        display.println("DSP %: " + String(avgDspTime));
+        display.println("DSP %: " + String(avgDspTime*100));
         display.println("PSRAM used: " + String(maxRam - ESP.getFreePsram()) + " / " + String(maxRam));
       }else{
         effects[menuPage]->Draw(&display);
