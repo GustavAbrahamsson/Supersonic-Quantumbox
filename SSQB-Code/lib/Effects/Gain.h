@@ -1,7 +1,7 @@
 #include "GenericEffect.h"
 
 // Simple gain
-class Clip : public GenericEffect{
+class Gain : public GenericEffect{
     private:
         #define MAXGAIN 10.0f
         String name = "Gain";
