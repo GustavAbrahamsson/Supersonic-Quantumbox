@@ -3,13 +3,13 @@
 class Clip : public GenericEffect{
     private:
         String name = "Clip";
-        uint32_t InputValues[1] = {4500};
+        float InputValues[1] = {0.5};
 
     public:
 
-        int32_t DSP(int32_t sample){
+        float DSP(float sample){
             // Clip me baby!
-            int32_t clip = ((int32_t) InputValues[0])*((INT32_MAX)/1024); 
+            float clip = InputValues[0]; 
         
             if(sample > clip){
                 return clip;
@@ -44,11 +44,11 @@ class Clip : public GenericEffect{
             }
         }
 
-        uint32_t getInputValue(uint32_t index){
+        float getInputValue(uint32_t index){
             return InputValues[index];
         }
 
-        void setInputValue(uint32_t index, uint32_t value){
+        void setInputValue(uint32_t index, float value){
             InputValues[index] = value;
         }
 };

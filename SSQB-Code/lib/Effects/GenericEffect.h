@@ -9,7 +9,7 @@
 class GenericEffect{
     public:
         // DSP function
-        virtual int32_t DSP(int32_t sample) = 0;
+        virtual float DSP(float sample) = 0;
         
         // Draw function
         virtual void Draw(Adafruit_SSD1306 * display) = 0;
@@ -24,10 +24,10 @@ class GenericEffect{
         virtual String getInputName(uint32_t index) = 0;
 
         // get parameter values
-        virtual uint32_t getInputValue(uint32_t index) = 0;
+        virtual float getInputValue(uint32_t index) = 0;
 
         // set parameter values
-        virtual void setInputValue(uint32_t index, uint32_t value) = 0;
+        virtual void setInputValue(uint32_t index, float) = 0;
 
 };
 

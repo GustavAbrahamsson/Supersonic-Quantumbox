@@ -8,27 +8,28 @@ class DelayEffect : public GenericEffect
 private:
     String name = "Delay";
     String InputNames[3] = {"RoomSize", "Spread", "Decay"};
-    uint32_t InputValues[3] = {100, 1000, 4000};
+    float InputValues[3] = {0.05, 0.1, 0.5};
 
     uint32_t delayTimes[4]; // number of samples to delay
 
-    AudioBuffer<int32_t> buffer = AudioBuffer<int32_t>();
+    AudioBuffer<float> buffer = AudioBuffer<float>();
 
 public:
-    int32_t DSP(int32_t sample)
+    float DSP(float sample)
     {
         //delay and feedback
-        int32_t dry = sample/2;
-        int32_t wet = 0;
+        float dry = sample * 0.5f;
+        float wet = 0;
 
         for (uint32_t i = 0; i < NUM_CHANNELS; i++)
         {
-            wet += buffer.read(delayTimes[i])/NUM_CHANNELS;
+            wet += buffer.read(delayTimes[i]) * (1.0f/NUM_CHANNELS); // read from feedback
         }
+        wet = wet * InputValues[2]; //decay 
         
-        buffer.write(dry + wet);
+        buffer.write(dry + wet); // send to feedback
 
-        return dry + wet/2;
+        return dry + wet;
     }
 
     void init()
@@ -41,7 +42,7 @@ public:
         // Draw lines for each channel corresponding to the delay time
         for (uint32_t i = 0; i < NUM_CHANNELS; i++)
         {
-            display->drawFastVLine(delayTimes[i] / (MAX_DELAY / 128.0), 30, 30, WHITE);
+            display->drawFastVLine(delayTimes[i] * (1/(MAX_DELAY/128.0f)), 30, 30, WHITE);
         }
 
         // Draw line for the current sample
@@ -64,18 +65,18 @@ public:
         return InputNames[index];
     }
 
-    uint32_t getInputValue(uint32_t index)
+    float getInputValue(uint32_t index)
     {
         return InputValues[index];
     }
 
-    void setInputValue(uint32_t index, uint32_t value)
+    void setInputValue(uint32_t index, float value)
     {
         InputValues[index] = value;
 
         if(index == 0 || index==1){
-            uint32_t delay = InputValues[0]* (MAX_DELAY/8192.0);
-            uint32_t spreadstep = delay * InputValues[1]/(8192.0 * (NUM_CHANNELS-1));
+            uint32_t delay = (uint32_t)(MAX_DELAY*InputValues[0]);
+            uint32_t spreadstep = delay * InputValues[1] * (1.0f/(NUM_CHANNELS-1));
 
             for(int i = 0; i < 4; i++){
                 delayTimes[i] = delay - i*spreadstep;

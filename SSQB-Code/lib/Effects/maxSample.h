@@ -4,18 +4,18 @@ class MaxSample : public GenericEffect
 {
 private:
     String name = "Level Meter";
-    uint32_t InputValues[0];
-    int32_t max = 0;
+    float InputValues[0];
+    float max = 0;
 
 public:
-    int32_t DSP(int32_t sample)
+    float DSP(float sample)
     {
         // Max sample with decay
         if (sample > max)
         {
             max = sample;
         }else{
-            max -= max/(1<<15); // set decay rate
+            max -= max*0.0001f; // set decay rate
         }
 
         return sample;
@@ -24,8 +24,8 @@ public:
     void Draw(Adafruit_SSD1306 *display)
     {
         // bar VU meter
-        int barHeight = max / (INT32_MAX / 40);
-        int pct = max / (INT32_MAX / 100);
+        int barHeight = (int) (max * 40.0f);
+        float pct = max * 100.0f;
         
         display->fillRect(10, 60-barHeight, 50, barHeight, WHITE);
         display->drawRect(5, 20, 60, 40, WHITE);
@@ -59,12 +59,12 @@ public:
         }
     }
 
-    uint32_t getInputValue(uint32_t index)
+    float getInputValue(uint32_t index)
     {
         return InputValues[index];
     }
 
-    void setInputValue(uint32_t index, uint32_t value)
+    void setInputValue(uint32_t index, float value)
     {
         InputValues[index] = value;
     }

@@ -48,17 +48,20 @@ bool POTS_ENABLED[6] = {true, true, true, false, false, true};
 // ----------Global variables-----------------
 
 // Effects
-MaxSample maxSample;
-Clip clip;
-DelayEffect delayEffect;
+MaxSample MaxInputMeter;
+//Clip clip;
+//DelayEffect delayEffect;
+MaxSample maxOutputMeter;
 Saturation saturationEffect;
 
-GenericEffect * effects[] = {&maxSample, &clip, &delayEffect, &saturationEffect};
+GenericEffect * effects[] = {&MaxInputMeter, &saturationEffect, &maxOutputMeter};
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
 // DSP variables
 #define I2S_NUM   I2S_NUM_0
 #define BUFFSIZE  128
+#define F_MUL (float)INT32_MAX
+#define F_DIV (float)(1.0f/INT32_MAX)
 
 int32_t i2s_write_buff[BUFFSIZE*2];
 int32_t i2s_read_buff[BUFFSIZE*2];
@@ -80,7 +83,8 @@ float avgDspTime = 0;
 #endif
 
 // potentiometers
-uint16_t pots[6];
+float pots[6];
+#define F_POTS 1.0f/8196.0f
 gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
 
 // OLED
@@ -139,7 +143,7 @@ void AudioTask(void *pvParameters){
     for (int i = 0; i < BUFFSIZE; i++)
     {
       //Save current sample
-      int32_t s = i2s_read_buff[i * 2];
+      float s = ((float) i2s_read_buff[i * 2])*F_DIV;
 
       // Call DSP function for modified sample
       for (int e = 0; e < numEffects; e++)
@@ -150,15 +154,16 @@ void AudioTask(void *pvParameters){
       // increment sample number
       n++;
 
+      int32_t si = s*F_MUL;
       //Write sample to I2S buffer
-      i2s_write_buff[i * 2] = s;
-      i2s_write_buff[i * 2 + 1] = s;
+      i2s_write_buff[i * 2] = si;
+      i2s_write_buff[i * 2 + 1] = si;
     }
 
     // Calculate DSP time
     uint32_t DSPTime = micros() - startTime;
-    float DSPpct = DSPTime*(48000.0/(BUFFSIZE*1000000.0));
-    avgDspTime = (avgDspTime * 0.95) + (DSPpct * 0.05);
+    float DSPpct = DSPTime*(48000.0f/(BUFFSIZE*1000000.0f));
+    avgDspTime = (avgDspTime * 0.95f) + (DSPpct * 0.05f);
 
     // Write to I2S
     bytes_written;
@@ -173,14 +178,13 @@ void PeripheralTask(void *pvParameters){
 
   while(1){
 
-    effects[2]->setInputValue(0, pots[0]);
-    effects[2]->setInputValue(1, pots[1]);
-    effects[2]->setInputValue(2, pots[2]);
+    //effects[2]->setInputValue(0, pots[0]);
+    //effects[2]->setInputValue(1, pots[1]);
+    //effects[2]->setInputValue(2, pots[2]);
     
-    effects[3]->setInputValue(0, pots[1]);
-    effects[3]->setInputValue(1, pots[0]);
-    effects[3]->setInputValue(2, pots[2]);
-    effects[3]->setInputValue(3, pots[3]);
+    effects[1]->setInputValue(0, pots[0]);
+    effects[1]->setInputValue(1, pots[1]);
+    effects[1]->setInputValue(2, pots[2]);
 
     // Read encoder
     #ifdef USE_ENCODER
@@ -241,7 +245,7 @@ void PeripheralTask(void *pvParameters){
     #endif
 
     // delay
-    delay(100);
+    delay(200);
   }
 }
 
@@ -251,10 +255,10 @@ void potLoop(void *pvParameters){
     for (int i = 0; i < 6; i++)
     {
       if(POTS_ENABLED[i]){
-        pots[i] = (pots[i]*63 + analogRead(potPins[i]))/64;
+        pots[i] = pots[i]*(0.9f) + analogRead(potPins[i])*(0.1f*F_POTS);
       }
     }
-    delay(1);
+    delay(10);
   }
 }
 
@@ -321,7 +325,7 @@ void setup() {
   // Start the audio task
   psramInit();
   Serial.println("PSRAM initialized");
-  delayEffect.init();
+  //delayEffect.init();
   
   delay(3000);
   // Start audio task
