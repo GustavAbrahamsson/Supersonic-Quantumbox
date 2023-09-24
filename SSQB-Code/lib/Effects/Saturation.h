@@ -65,28 +65,18 @@ class Saturation : public GenericEffect{
         int32_t max_amplitude = INT32_MAX;
         String name = "Saturation";
         uint8_t numInputs = 4;
-        float InputValues[4] = {0.5f, 0.1f, 0.1f, 0.5f}; // something something input
+        float InputValues[4] = {1.0f, 0.0f, 0.0f, 1.0f}; // something something input
         String inputNames[4] = {"CLIP", "SMTH", "SQRN", "EVEN"};
 
-        double clip_apex = 0.4*max_amplitude;
-        double hard_level = 0.4*max_amplitude;
-        float clip_smoothness = 0.3f;
-        float squareness = 0.5f;
-        float evenness = -1.0f;
-
-        float gain = 2.0f;
+        // Calculated from inputs
+        float gain = 1.0f;
         float neg_gain = 1.0f;
-        float soft_end = 1.2f;
+        float soft_end = 1.0f;
         float soft_start = 1.0f;
         float r = 0.0f;
         float s = 0.0f;
-        float max_level = 0.7f;
+        float max_level = 1.0f;
         
-        // Calculated parameters from inputs, adjusted for squareness
-        double soft_clip = clip_apex * (1 - clip_smoothness / 2) * (1 - squareness);
-        double hard_clip = clip_apex * (1 + clip_smoothness / 2) * (1 - squareness);
-        double soft_level = soft_clip / (1 - squareness);
-
         // Draw
         Adafruit_SSD1306* disp;
         #define box_size_x 64
@@ -296,7 +286,7 @@ class Saturation : public GenericEffect{
 
         void setInputValue(uint32_t index, float value){
             InputValues[index] = value;
-            updateCurve();
+            updateCurve();              //Update curve parameters
         }
 
 
