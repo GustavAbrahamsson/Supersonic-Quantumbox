@@ -1,5 +1,6 @@
 
 #include <string>
+#include "math.h"
 
 // Creates a saturation effect following something similar to:
 
@@ -64,27 +65,27 @@ class Saturation : public GenericEffect{
         int32_t max_amplitude = INT32_MAX;
         String name = "Saturation";
         uint8_t numInputs = 4;
-        uint32_t InputValues[4] = {4500, 1000, 1000, 1000}; // something something input
+        float InputValues[4] = {1.0f, 0.0f, 0.0f, 1.0f}; // something something input
         String inputNames[4] = {"CLIP", "SMTH", "SQRN", "EVEN"};
 
-        double clip_apex = 0.4*max_amplitude;
-        double hard_level = 0.4*max_amplitude;
-        float clip_smoothness = 0.3f;
-        float squareness = 0.5f;
-        float evenness = -1.0f;
+        // Calculated from inputs
+        float gain = 1.0f;
+        float neg_gain = 1.0f;
+        float soft_end = 1.0f;
+        float soft_start = 1.0f;
+        float r = 0.0f;
+        float s = 0.0f;
+        float max_level = 1.0f;
         
-        // Calculated parameters from inputs, adjusted for squareness
-        double soft_clip = clip_apex * (1 - clip_smoothness / 2) * (1 - squareness);
-        double hard_clip = clip_apex * (1 + clip_smoothness / 2) * (1 - squareness);
-        double soft_level = soft_clip / (1 - squareness);
-
         // Draw
         Adafruit_SSD1306* disp;
-        uint8_t box_size_x = 64;
-        uint8_t box_size_y = 64;
-        uint8_t box_x0 = 63;
-        uint8_t box_y0 = 0;
+        #define box_size_x 64
+        #define box_size_y 64
+        #define box_x0 63
+        #define box_y0 0
 
+        #define box_step_x 2.0f/((float) box_size_x)
+        #define box_step_y ((float) box_size_y)/2.0f
         
         void drawLine_box(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1){
             // Constrained to box_size frame
@@ -97,7 +98,6 @@ class Saturation : public GenericEffect{
             Serial.println(y1 + box_y0); Serial.println(" ");
             */
             disp->drawLine(box_x0 + x0, box_y0 + y0, box_x0 + x1, box_y0 + y1, 1);
-            
         }
 
         void drawPixel_box(uint8_t x, uint8_t y){
@@ -147,13 +147,65 @@ class Saturation : public GenericEffect{
             drawPixel_box(x, y);
         }
 
+        void updateCurve()
+        {
+            s = InputValues[1] * (float) M_SQRT2;
+            r = s * ((float) M_SQRT2 + 1);
+
+            gain = (1+16*InputValues[2])/InputValues[0];
+            neg_gain = InputValues[3];
+
+            soft_start = 1-InputValues[1];
+            soft_end = s + 1;
+            max_level = InputValues[0];
+        }
+
+        float f_sqrt(float f)
+        // Calculates 1/sqrt(f) using quake alg, then sqrt(f) = f* 1/sqrt(f) 
+        {
+            long i;
+            float x2, y;
+            const float threehalfs = 1.5F;
+
+            x2 = f * 0.5F;
+            y = f;
+            i = *(long *)&y;           // evil floating point bit level hacking
+            i = 0x5f3759df - (i >> 1); // what the fuck?
+            y = *(float *)&i;
+            y = y * (threehalfs - (x2 * y * y)); // 1st iteration
+            // y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
+
+            return f*y;
+        }
 
     public:
-        int32_t DSP(int32_t sample){
+        float DSP(float sample){
+            // See https://www.geogebra.org/calculator/ynjbbcu8 for equations
+            // "smooth" part is modeled as an arc
+
+            bool neg = false;
             
-            //int32_t clip = ((int32_t) InputValues[0])*((INT32_MAX)/1024); 
-        
-            return sample;
+            float x = sample * gain;
+
+            if(sample < 0)
+            {
+                x = -x;
+                neg = true;
+            }
+
+            if(x > soft_end){
+                x = 1;
+            }else if(x > soft_start){
+                x = f_sqrt((r+x-1-s)*(r-x+1+s)) + 1-r;
+            }
+
+            x = x * max_level;
+
+            if(neg){
+                x= -x*neg_gain;
+            }
+
+            return x;
         }
 
         void Draw(Adafruit_SSD1306* display){
@@ -187,31 +239,25 @@ class Saturation : public GenericEffect{
 
             //drawLine_sample(0, 0, INT32_MAX / 2, INT32_MAX / 2);
 
-            drawLine_sample(0, 0, soft_clip, soft_level);
-            drawLine_sample(0, 0, -soft_clip, -soft_level);
+            uint8_t last_y = 0;
+
+            // feed -1 .. 1 into DSP, display on screen
+            for(uint8_t x = 0; x<box_size_x; x++){
+                float xf = -1 + x * box_step_x;
+                float yf = DSP(xf);
+                uint8_t y = 64 - (yf+1) * box_step_y;
+                drawPixel_box(x, y);
+
+                if(last_y - y > 1) // if more than one step in y, fill with line
+                {
+                    drawLine_box(x, last_y-1, x, y+1);
+                }
+                last_y = y;
+            }
         }
 
 
-        void updateCurve(int32_t new_clip_apex, int32_t new_hard_level, float new_clip_smoothness, float new_squareness, float new_evenness){
-            // Update
-            clip_apex = new_clip_apex;
-            hard_level = new_hard_level;
-            clip_smoothness = new_clip_smoothness;
-            squareness = new_squareness;
-            evenness = new_evenness;
-            
-            // Calculated parameters from inputs
-            soft_clip = clip_apex * (1 - clip_smoothness / 2);
-            hard_clip = clip_apex * (1 + clip_smoothness / 2);
-            soft_level = soft_clip;
-
-            // Adjust for squareness
-            soft_clip *= (1 - squareness);
-            clip_apex *= (1 - squareness);
-            hard_clip *= (1 - squareness);
-        
-        }
-         String getName(){
+        String getName(){
             return name;
         }
 
@@ -234,12 +280,13 @@ class Saturation : public GenericEffect{
             }
         }
 
-        uint32_t getInputValue(uint32_t index){
+        float getInputValue(uint32_t index){
             return InputValues[index];
         }
 
-        void setInputValue(uint32_t index, uint32_t value){
+        void setInputValue(uint32_t index, float value){
             InputValues[index] = value;
+            updateCurve();              //Update curve parameters
         }
 
 

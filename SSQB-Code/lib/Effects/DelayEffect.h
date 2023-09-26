@@ -1,34 +1,43 @@
 #include "GenericEffect.h"
 
-#define MAX_DELAY 48000/4
-#define NUM_CHANNELS 4
+#define MAX_DELAY 48000
+#define NUM_CHANNELS 3
 
 class DelayEffect : public GenericEffect
 {
 private:
     String name = "Delay";
-    String InputNames[3] = {"RoomSize", "Spread", "Decay"};
-    uint32_t InputValues[3] = {100, 1000, 4000};
+    String InputNames[3] = {"RoomSize", "Decay"};
+    float InputValues[3] = {0.5f, 0.2f};
 
-    uint32_t delayTimes[4]; // number of samples to delay
+    float oldFB = 0;
 
-    AudioBuffer<int32_t> buffer = AudioBuffer<int32_t>();
+    uint32_t delayTimes[NUM_CHANNELS]; // delay times for each channel
+    float delaySteps[NUM_CHANNELS] = {0.42f, 0.63f, 1.0f}; // delay steps for each channel
+
+    AudioBuffer<float> buffer = AudioBuffer<float>();
 
 public:
-    int32_t DSP(int32_t sample)
+    float DSP(float sample)
     {
-        //delay and feedback
-        int32_t dry = sample/2;
-        int32_t wet = 0;
+        // delay and feedback
+        // Percussive elements are more pronounced
+        float dry = sample * 0.5f;
+        float wet = 0.0f;
 
         for (uint32_t i = 0; i < NUM_CHANNELS; i++)
         {
-            wet += buffer.read(delayTimes[i])/NUM_CHANNELS;
+            wet += buffer.read(delayTimes[i]) * (1.0f/NUM_CHANNELS); // read from feedback
         }
+        wet = wet * InputValues[1]; //decay 
         
-        buffer.write(dry + wet);
+        float FB = dry + wet;
 
-        return dry + wet/2;
+        buffer.write(FB); // send to feedback
+
+        return FB;
+
+        // Consider https://ccrma.stanford.edu/~dattorro/EffectDesignPart1.pdf for reverb design
     }
 
     void init()
@@ -41,11 +50,11 @@ public:
         // Draw lines for each channel corresponding to the delay time
         for (uint32_t i = 0; i < NUM_CHANNELS; i++)
         {
-            display->drawFastVLine(delayTimes[i] / (MAX_DELAY / 128.0), 30, 30, WHITE);
+            display->drawFastVLine(delayTimes[i] * (1/(MAX_DELAY/128.0f)), 32 + 32*(1.0f-InputValues[1]), 32, WHITE);
         }
 
         // Draw line for the current sample
-        display->drawFastVLine(0, 30, 30, WHITE);
+        display->drawFastVLine(0, 32, 32, WHITE);
 
     }
 
@@ -64,21 +73,20 @@ public:
         return InputNames[index];
     }
 
-    uint32_t getInputValue(uint32_t index)
+    float getInputValue(uint32_t index)
     {
         return InputValues[index];
     }
 
-    void setInputValue(uint32_t index, uint32_t value)
+    void setInputValue(uint32_t index, float value)
     {
         InputValues[index] = value;
 
-        if(index == 0 || index==1){
-            uint32_t delay = InputValues[0]* (MAX_DELAY/8192.0);
-            uint32_t spreadstep = delay * InputValues[1]/(8192.0 * (NUM_CHANNELS-1));
+        if(index == 0){
+            uint32_t delay = (uint32_t)(MAX_DELAY*InputValues[0]);
 
-            for(int i = 0; i < 4; i++){
-                delayTimes[i] = delay - i*spreadstep;
+            for(int i = 0; i < NUM_CHANNELS; i++){
+                delayTimes[i] = delay * delaySteps[i];
             }
         }
     }

@@ -1,32 +1,24 @@
 #include "GenericEffect.h"
 
-// Limits the signal (hard clip) 
-class Clip : public GenericEffect{
+// Simple gain
+class Gain : public GenericEffect{
     private:
-        String name = "Clip";
-        float InputValues[1] = {1.0f};
+        #define MAXGAIN 10.0f
+        String name = "Gain";
+        float InputValues[1] = {1.0f/MAXGAIN};
+        float gain = 1.0f;
 
     public:
 
         float DSP(float sample){
-            // Clip me baby!
-            float clip = InputValues[0]; 
-        
-            if(sample > clip){
-                return clip;
-            }
-            if(sample < -clip){
-                return -clip;
-            }
-        
-            return sample;
+            // Gain 
+            return sample * gain;
         }
 
         void Draw(Adafruit_SSD1306 * display){
             display->setCursor(0,30);
-            display->print("Level: ");
-            display->print(InputValues[0]*100.0f);
-            display->println("%");
+            display->print("Gain: ");
+            display->println(gain);
         }
 
         String getName(){
@@ -40,7 +32,7 @@ class Clip : public GenericEffect{
         String getInputName(uint32_t index){
             switch(index){
                 case 0:
-                    return "Level";
+                    return "Gain";
                 default:
                     return "Error";
             }
@@ -52,5 +44,6 @@ class Clip : public GenericEffect{
 
         void setInputValue(uint32_t index, float value){
             InputValues[index] = value;
+            gain = InputValues[0]*MAXGAIN;
         }
 };
