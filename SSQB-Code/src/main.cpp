@@ -6,8 +6,12 @@
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 #include <Fonts/Picopixel.h>
+
+#include <MenuHelper.h>
+
 #include <AudioBuffer.h>
 #include <GenericEffect.h>
+
 #include <Clip.h>
 #include <Meter.h>
 #include <DelayEffect.h>
@@ -63,6 +67,16 @@ GenericEffect * effects[] = {
   };
 
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
+
+// Bindings for each pot
+PotBinding potBindings[] = {
+  {&delayEffect, 0},
+  {&delayEffect, 1},
+  {&delayEffect, 2},
+  {NULL, 0},
+  {NULL, 0},
+  {NULL, 0}
+};
 
 // DSP variables
 #define I2S_NUM   I2S_NUM_0
