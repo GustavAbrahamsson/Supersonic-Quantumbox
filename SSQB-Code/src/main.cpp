@@ -22,6 +22,7 @@
 #define USE_ENCODER
 #define USE_PIXELS
 #define USE_LEDS
+#define USE_TRUE_BP
 
 // Set to true to enable pot
 bool POTS_ENABLED[6] = {true, true, true, false, false, true};
@@ -45,6 +46,7 @@ bool POTS_ENABLED[6] = {true, true, true, false, false, true};
 #define DIN       GPIO_NUM_16
 #define DOUT      GPIO_NUM_17
 #define LRCLK     GPIO_NUM_18
+#define TRUE_BP   GPIO_NUM_37 // Used on Gustav's pedal
 
 // ----------Global variables-----------------
 
@@ -75,10 +77,14 @@ int32_t i2s_read_buff[BUFFSIZE*2];
 uint32_t n = 0;
 float avgDspTime = 0;
 
+// True: true bypass, the signal is skipping the pedal
+// False: the signal is passing through the pedal
+bool trueBypass = false;
+
 // Neopixel
 #ifdef USE_PIXELS
   int pixelCount = 2;
-  RgbColor pixelColors[] = {RgbColor(0,0,0), RgbColor(0,0,0)};
+  RgbColor pixelColors[] = {RgbColor(64,0,0), RgbColor(0,0,0)};
   NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(pixelCount, PIXELPIN);
 #endif
 
@@ -200,9 +206,17 @@ void PeripheralTask(void *pvParameters){
 
     // write to neopixels
     #ifdef USE_PIXELS
-      strip.SetPixelColor(0, pixelColors[0]);
+      // Switch on/off one of the neopixels to show when the signal is passing through the signal
+      if(!trueBypass) strip.SetPixelColor(0, pixelColors[0]);
+      else strip.SetPixelColor(0, RgbColor(0,0,0));
+
       strip.SetPixelColor(1, pixelColors[1]);
       strip.Show();
+    #endif
+
+    // Check the state of the main switch
+    #ifdef USE_TRUE_BP
+      trueBypass = digitalRead(TRUE_BP);
     #endif
 
     // write to OLED
@@ -287,6 +301,12 @@ void setup() {
     encoder.clearCount();
     Serial.println("Encoder initialized");
     pinMode(ENC_SW, INPUT_PULLUP);
+  #endif
+
+  // If the state of the switch (true bypass) is measured at pin 'TRUE_BP'
+  #ifdef USE_TRUE_BP
+    pinMode(TRUE_BP, INPUT_PULLUP);
+    trueBypass = digitalRead(TRUE_BP);
   #endif
 
   // Initialize I2S
