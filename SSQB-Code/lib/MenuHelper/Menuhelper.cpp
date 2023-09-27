@@ -4,94 +4,91 @@
 // effects: array of effects
 // potBindings: array of pot bindings
 // display: pointer to display
-MenuHelper::MenuHelper(GenericEffect * effects[], uint32_t numEffects, PotStruct pots[], Adafruit_SSD1306 * display){
-    this->effects = effects;
-    this->numEffects = numEffects;
-    this->pots = pots;
-    this->display = display;
-
-    // Create states
-    /*
-    EffectViewState = &new EffectViewState();
-    ParamViewState = &new ParamViewState();
-    ParamEditState = &new ParamEditState();
-    DebugScreenState = &(new DebugScreenState();
-    */
-
-
+MenuHelper::MenuHelper(PedalContext * ctx){
+    this->ctx = ctx;
 }
 
 // Handle encoder input
 // inputEvent: one of MENU_LEFT, MENU_RIGHT, MENU_PRESS, MENU_HOLD
 void MenuHelper::HandleInput(inputEvent e){
-    switch (e)
+    menuState newState = CurrentState->HandleInput(e, ctx);
+    
+    switch (newState)
     {
-    case MENU_LEFT:
-        CurrentState->Left(this);
+    case MENU_EFFECT_VIEW:
+        CurrentState = &effectViewState;
         break;
-    case MENU_RIGHT:
-        CurrentState->Right(this);
-        break;
-    case MENU_PRESS:
-        CurrentState->Press(this);
-        break;
-    case MENU_HOLD:
-        CurrentState->Hold(this);
-        break;
+    case MENU_PARAM_VIEW:
+        CurrentState = &paramViewState;
+    case MENU_DEBUG_SCREEN:
+        CurrentState = &debugScreenState;
+    // case MENU_PARAM_EDIT:
+    //     CurrentState = &paramEditState;
+    case MENU_STAY:
+        return;
     default:
         break;
     }
+
+    CurrentState->Enter(ctx);
+}
+
+void MenuHelper::UpdateDisplay(){
+    CurrentState->Draw(ctx);
 }
 
 // Effect view state
 
-void EffectViewState::Enter(MenuHelper * menuHelper){
-    menuHelper->CurrentState = &menuHelper->effectViewState;
-    Draw(menuHelper);
+void EffectViewState::Enter(PedalContext * ctx){
+    Draw(ctx);
 }
 
-void EffectViewState::Left(MenuHelper * menuHelper){
-    if (CurrentEffectNum + 1 < menuHelper->numEffects)
-        CurrentEffectNum++;
+menuState EffectViewState::HandleInput(inputEvent e, PedalContext * ctx){
+    switch (e)
+    {
+    case MENU_LEFT:
+        if (ctx->CurrentEffectNum + 1 < ctx->numEffects)
+            ctx->CurrentEffectNum++;
+        break;
+    case MENU_RIGHT:
+        if (ctx->CurrentEffectNum > 0)
+            ctx->CurrentEffectNum--;
+        else
+            return MENU_DEBUG_SCREEN;
+        break;
+    case MENU_PRESS:
+        return MENU_PARAM_VIEW;
+    case MENU_HOLD:
+        // ctx->effects[CurrentEffectNum]->Mute();
+        break;
+    default:
+        break;
+    }
+
+    return MENU_STAY;
 }
 
-void EffectViewState::Right(MenuHelper * menuHelper){
-    if (CurrentEffectNum > 0)
-        CurrentEffectNum--;
-    else
-        menuHelper->debugScreenState.Enter(menuHelper);
-}
-
-void EffectViewState::Press(MenuHelper * menuHelper){
-    menuHelper->paramViewState.Enter(menuHelper);
-}
-
-void EffectViewState::Hold(MenuHelper * menuHelper){
-    //menuHelper->effects[CurrentEffectNum]->Mute();
-}
-
-void EffectViewState::Draw(MenuHelper * menuHelper){
-    Adafruit_SSD1306 * d = menuHelper->display;
+void EffectViewState::Draw(PedalContext * ctx){
+    Adafruit_SSD1306 * d = ctx->display;
     d->setCursor(0, 0);
     d->clearDisplay();
-    d->println(menuHelper->effects[CurrentEffectNum]->getName());
+    d->println(ctx->effects[ctx->CurrentEffectNum]->getName());
     d->setFont(&Picopixel);
     d->drawFastHLine(0, 10, 128, 1);
     d->setCursor(0, 20);
-    menuHelper->effects[CurrentEffectNum]->Draw(menuHelper->display);
+    ctx->effects[ctx->CurrentEffectNum]->Draw(ctx->display);
     d->display();
 }
 
 // Debug View state
-void DebugScreenState::Enter(MenuHelper *menuHelper)
+void DebugScreenState::Enter(PedalContext *ctx)
 {
-    menuHelper->CurrentState = &menuHelper->debugScreenState;
-    Draw(menuHelper);
+    Draw(ctx);
 }
 
-void DebugScreenState::Draw(MenuHelper * MenuHelper){
+void DebugScreenState::Draw(PedalContext * ctx){
     // diagnostics display
-    Adafruit_SSD1306 * d = MenuHelper->display;
+    Adafruit_SSD1306 * d = ctx->display;
 
     d->setCursor(0, 0);
     d->println("Diagnostics");
@@ -105,19 +102,38 @@ void DebugScreenState::Draw(MenuHelper * MenuHelper){
     //d->println("PSRAM used: " + String(maxRam - ESP.getFreePsram()) + " / " + String(maxRam));
 }
 
-void DebugScreenState::Left(MenuHelper * menuHelper){
-    menuHelper->effectViewState.Enter(menuHelper);
+menuState DebugScreenState::HandleInput(inputEvent e, PedalContext * ctx){
+    switch (e)
+    {
+    case MENU_LEFT:
+        return MENU_EFFECT_VIEW;
+    default:
+        break;
+    }
+    return MENU_STAY;
 }
 
 
 // Param view state
-void ParamViewState::Enter(MenuHelper * menuHelper){
-    menuHelper->CurrentState = &menuHelper->paramViewState;
-    menuHelper->CurrentParamNum = 0;
+void ParamViewState::Enter(PedalContext * ctx){
+    ctx->CurrentParamNum = 0;
+    Draw(ctx);
 }
 
-void ParamViewState::Press(MenuHelper * menuHelper){
-    menuHelper->effectViewState.Enter(menuHelper);
+menuState ParamViewState::HandleInput(inputEvent e, PedalContext * ctx){
+    switch (e)
+    {
+    case MENU_PRESS:
+        return MENU_EFFECT_VIEW;
+    default:
+        break;
+    }
+
+    return MENU_STAY;
+}
+
+void ParamViewState::Draw(PedalContext * ctx){
+    Adafruit_SSD1306 * d = ctx->display;
 }
 
 

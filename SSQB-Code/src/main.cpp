@@ -5,7 +5,6 @@
 #include "dsps_fft2r.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
-#include <Fonts/Picopixel.h>
 
 #include <MenuHelper.h>
 
@@ -68,16 +67,6 @@ GenericEffect * effects[] = {
 
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
-// Bindings for each pot
-PotBinding potBindings[] = {
-  {&delayEffect, 0},
-  {&delayEffect, 1},
-  {&delayEffect, 2},
-  {NULL, 0},
-  {NULL, 0},
-  {NULL, 0}
-};
-
 // DSP variables
 #define I2S_NUM   I2S_NUM_0
 #define BUFFSIZE  128
@@ -112,6 +101,26 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
 #ifdef USE_OLED
   TwoWire OledWire = TwoWire(0);
   Adafruit_SSD1306 display(128, 64, &OledWire, -1);
+
+  // Bindings for each pot
+  PotStruct potStruct[] = {
+      {0.0f, 1, 0},
+      {0.0f, 1, 1},
+      {0.0f, 1, 2},
+      {0.0f, 0, 0},
+      {0.0f, 0, 0},
+      {0.0f, 0, 0}};
+
+  PedalContext ctx = {
+    effects,
+    numEffects,
+    potStruct,
+    &display,
+    0,
+    0
+  };
+
+  MenuHelper menuHelper = MenuHelper(&ctx);
 #endif
 
 // LED filaments
@@ -195,7 +204,7 @@ void AudioTask(void *pvParameters){
 void PeripheralTask(void *pvParameters){
 
   uint32_t maxRam = ESP.getPsramSize();
-  int32_t menuPage = 0;
+  int32_t lastEncoderCount = 0;
 
   while(1){
 
@@ -221,41 +230,17 @@ void PeripheralTask(void *pvParameters){
 
     // write to OLED
     #ifdef USE_OLED
-      display.clearDisplay();
-      display.setFont(NULL);
 
-      if(encoderCount <= -1)
-        menuPage = -1;
-      else if(encoderCount > numEffects-1)
-        menuPage = numEffects-1;
-      else
-        menuPage = encoderCount;
-
-      // Menu
-      if(menuPage == -1){
-        // diagnostics display
-        display.setCursor(0,0);
-        display.println("Diagnostics");
-        display.drawFastHLine(0, 10, 128, 1);
-        display.setFont(&Picopixel);
-        display.setCursor(0, 20);
-        display.println("Encoder: " + String(encoderCount));
-        display.println("Button: " + String(encoderButton));
-        display.println("Pots: " + String(pots[0]) + ", " + String(pots[1]) + ", " + String(pots[2]));
-        display.println("DSP %: " + String(avgDspTime*100));
-        display.println("PSRAM used: " + String(maxRam - ESP.getFreePsram()) + " / " + String(maxRam));
+      if(encoderButton){
+        menuHelper.HandleInput(MENU_PRESS);
+      }else if(encoderCount > lastEncoderCount){
+        menuHelper.HandleInput(MENU_RIGHT);
+      }else if(encoderCount < lastEncoderCount){
+        menuHelper.HandleInput(MENU_LEFT);
       }else{
-        effects[menuPage]->Draw(&display);
-        display.setCursor(0, 0);
-        display.println(effects[menuPage]->getName());
-        if(effects[menuPage]->getName() != "Saturation"){
-            display.drawFastHLine(0, 10, 128, 1);
-        }
-        display.setFont(&Picopixel);
-        display.setCursor(0, 20);
+        menuHelper.UpdateDisplay();
       }
       
-      display.display();
     #endif
 
     //write to LED filaments

@@ -19,7 +19,8 @@ enum menuState
     MENU_EFFECT_VIEW,
     MENU_PARAM_VIEW,
     MENU_PARAM_EDIT,
-    MENU_DEBUG_SCREEN
+    MENU_DEBUG_SCREEN,
+    MENU_STAY
 };
 
 typedef struct pedalContext 
@@ -29,41 +30,34 @@ typedef struct pedalContext
     uint32_t numEffects;
     PotStruct *pots;
     Adafruit_SSD1306 *display;
+    uint32_t CurrentEffectNum;
+    uint32_t CurrentParamNum;
 } PedalContext;
 
 // State machine base class
 class ScreenState
 {
 public:
-    virtual void Draw(MenuHelper *) = 0;
-    virtual void Enter(MenuHelper *) = 0;
-    void Left(MenuHelper *);
-    void Right(MenuHelper *);
-    void Press(MenuHelper *);
-    void Hold(MenuHelper *);
+    virtual void Draw(PedalContext *) = 0;
+    virtual void Enter(PedalContext *) = 0;
+    virtual menuState HandleInput(inputEvent, PedalContext *) = 0;
 };
 
 // Effect view state
 class EffectViewState : public ScreenState
 {
-private:
-    uint32_t CurrentEffectNum;
-
 public:
-    void Left(MenuHelper *);
-    void Right(MenuHelper *);
-    void Press(MenuHelper *);
-    void Hold(MenuHelper *);
-    void Draw(MenuHelper *);
-    void Enter(MenuHelper *);
+    menuState HandleInput(inputEvent, PedalContext *);
+    void Draw(PedalContext *);
+    void Enter(PedalContext *);
 };
 
 class ParamViewState : public ScreenState
 {
 public:
-    void Enter(MenuHelper *);
-    void Draw(MenuHelper *);
-    void Press(MenuHelper *);
+    void Enter(PedalContext *);
+    void Draw(PedalContext *);
+    menuState HandleInput(inputEvent, PedalContext *);
 };
 
 class ParamEditState : public ScreenState
@@ -73,21 +67,15 @@ class ParamEditState : public ScreenState
 class DebugScreenState : public ScreenState
 {
 public:
-    void Enter(MenuHelper *);
-    void Draw(MenuHelper *);
-    void Left(MenuHelper *);
+    void Enter(PedalContext *);
+    void Draw(PedalContext *);
+    menuState HandleInput(inputEvent, PedalContext *);
 };
 
 // Menu system for the pedal
 class MenuHelper
 {
 private:
-    friend class ScreenState;
-    friend class EffectViewState;
-    friend class ParamViewState;
-    friend class ParamEditState;
-    friend class DebugScreenState;
-
     // State variables
     ScreenState *CurrentState;
     uint32_t CurrentEffectNum = 0;
@@ -107,7 +95,7 @@ public:
     // numEffects: number of effects
     // potBindings: array of pot bindings
     // display: pointer to display
-    MenuHelper(GenericEffect *[], uint32_t numEffects, PotStruct[], Adafruit_SSD1306 *);
+    MenuHelper(PedalContext *);
 
     // Handle encoder input
     // inputEvent: one of MENU_LEFT, MENU_RIGHT, MENU_PRESS, MENU_HOLD
@@ -115,4 +103,7 @@ public:
 
     // Update the display
     void UpdateDisplay();
+
+    // Transition state
+    void Transition(menuState);
 };
