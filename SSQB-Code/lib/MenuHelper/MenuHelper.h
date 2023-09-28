@@ -78,9 +78,7 @@ class MenuHelper
 private:
     // State variables
     ScreenState *CurrentState;
-    uint32_t CurrentEffectNum = 0;
-    uint32_t CurrentParamNum = 0;
-
+    
     EffectViewState effectViewState;
     ParamViewState paramViewState;
     // ParamEditState paramEditState;

@@ -29,6 +29,8 @@ class GenericEffect{
         // set parameter values
         virtual void setInputValue(uint32_t index, float) = 0;
 
+        virtual void init(){};
+
 };
 
 #endif

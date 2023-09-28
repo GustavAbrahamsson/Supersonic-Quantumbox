@@ -6,6 +6,8 @@
 // display: pointer to display
 MenuHelper::MenuHelper(PedalContext * ctx){
     this->ctx = ctx;
+    CurrentState = &effectViewState;
+    //CurrentState->Enter(ctx);
 }
 
 // Handle encoder input
@@ -70,6 +72,7 @@ menuState EffectViewState::HandleInput(inputEvent e, PedalContext * ctx){
 
 void EffectViewState::Draw(PedalContext * ctx){
     Adafruit_SSD1306 * d = ctx->display;
+    d->setFont(NULL);
     d->setCursor(0, 0);
     d->clearDisplay();
     d->println(ctx->effects[ctx->CurrentEffectNum]->getName());
@@ -89,7 +92,8 @@ void DebugScreenState::Enter(PedalContext *ctx)
 void DebugScreenState::Draw(PedalContext * ctx){
     // diagnostics display
     Adafruit_SSD1306 * d = ctx->display;
-
+    d->setFont(NULL);
+    d->clearDisplay();
     d->setCursor(0, 0);
     d->println("Diagnostics");
     d->drawFastHLine(0, 10, 128, 1);
@@ -100,6 +104,7 @@ void DebugScreenState::Draw(PedalContext * ctx){
     //d->println("Pots: " + String(pots[0]) + ", " + String(pots[1]) + ", " + String(pots[2]));
     //d->println("DSP %: " + String(avgDspTime * 100));
     //d->println("PSRAM used: " + String(maxRam - ESP.getFreePsram()) + " / " + String(maxRam));
+    d->display();
 }
 
 menuState DebugScreenState::HandleInput(inputEvent e, PedalContext * ctx){
@@ -134,9 +139,21 @@ menuState ParamViewState::HandleInput(inputEvent e, PedalContext * ctx){
 
 void ParamViewState::Draw(PedalContext * ctx){
     Adafruit_SSD1306 * d = ctx->display;
+    d->setFont(NULL);
+    d->setCursor(0, 0);
+    d->clearDisplay();
+    d->println(ctx->effects[ctx->CurrentEffectNum]->getName());
+    d->setFont(&Picopixel);
+    d->drawFastHLine(0, 10, 128, 1);
+    d->setCursor(0, 20);
+    uint32_t num_p = ctx->effects[ctx->CurrentEffectNum]->getNumInputs();
+    for(int i = 0; i < num_p; i++){
+        d->print(ctx->effects[ctx->CurrentEffectNum]->getInputName(i));
+        d->print(": ");
+        d->println(ctx->effects[ctx->CurrentEffectNum]->getInputValue(i));
+    }
+    d->display();
 }
-
-
 
 
 /**

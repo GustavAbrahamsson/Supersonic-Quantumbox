@@ -2,7 +2,6 @@
 
 typedef struct potStruct
 {
-    float value;
-    unsigned char effectNum;
+    signed char effectNum;
     unsigned char paramNum;
 }PotStruct;

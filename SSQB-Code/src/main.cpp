@@ -27,7 +27,7 @@
 #define USE_LEDS
 
 // Set to true to enable pot
-bool POTS_ENABLED[6] = {true, true, true, false, false, true};
+bool POTS_ENABLED[6] = {true, true, true, false, false, false};
 
 // ----------------Pins-----------------------
 #define POT1      GPIO_NUM_1
@@ -67,6 +67,15 @@ GenericEffect * effects[] = {
 
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
+// Bindings for each pot (Effect number, parameter number)
+PotStruct potStruct[] = {
+    {1, 0},
+    {1, 1},
+    {1, 2},
+    {-1, 0},
+    {-1, 0},
+    {-1, 0}};
+
 // DSP variables
 #define I2S_NUM   I2S_NUM_0
 #define BUFFSIZE  128
@@ -102,15 +111,6 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
   TwoWire OledWire = TwoWire(0);
   Adafruit_SSD1306 display(128, 64, &OledWire, -1);
 
-  // Bindings for each pot
-  PotStruct potStruct[] = {
-      {0.0f, 1, 0},
-      {0.0f, 1, 1},
-      {0.0f, 1, 2},
-      {0.0f, 0, 0},
-      {0.0f, 0, 0},
-      {0.0f, 0, 0}};
-
   PedalContext ctx = {
     effects,
     numEffects,
@@ -120,7 +120,14 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
     0
   };
 
-  MenuHelper menuHelper = MenuHelper(&ctx);
+  MenuHelper menuHelper = NULL;
+#endif
+
+// Macro for debug output during startup
+#ifdef USE_OLED
+  #define debugPrint(x) {display.println(x); display.display();}
+#else
+  #define debugPrint(x) {Serial.println(x);}
 #endif
 
 // LED filaments
@@ -203,17 +210,27 @@ void AudioTask(void *pvParameters){
 
 void PeripheralTask(void *pvParameters){
 
-  uint32_t maxRam = ESP.getPsramSize();
-  int32_t lastEncoderCount = 0;
+  
+  #ifdef USE_OLED
+    uint32_t maxRam = ESP.getPsramSize();
+    
+    int32_t lastEncoderCount = 0;
+    menuHelper = MenuHelper(&ctx);
+  #endif
 
   while(1){
 
-    //effects[2]->setInputValue(0, pots[0]);
-    //effects[2]->setInputValue(1, pots[1]);
-    //effects[2]->setInputValue(2, pots[2]);
+    // send pot values to effects
+    for(int i = 0; i<6; i++){
+      if(POTS_ENABLED[i]){
+        int8_t effectNum = potStruct[i].effectNum;
+        uint8_t paramNum = potStruct[i].paramNum;
+
+        if(effectNum != -1)
+          effects[effectNum]->setInputValue(paramNum, pots[i]);        
+      }
+    }
     
-    delayEffect.setInputValue(0, pots[0]);
-    delayEffect.setInputValue(1, pots[1]);
 
     // Read encoder
     #ifdef USE_ENCODER
@@ -234,9 +251,11 @@ void PeripheralTask(void *pvParameters){
       if(encoderButton){
         menuHelper.HandleInput(MENU_PRESS);
       }else if(encoderCount > lastEncoderCount){
-        menuHelper.HandleInput(MENU_RIGHT);
-      }else if(encoderCount < lastEncoderCount){
         menuHelper.HandleInput(MENU_LEFT);
+        lastEncoderCount = encoderCount;
+      }else if(encoderCount < lastEncoderCount){
+        menuHelper.HandleInput(MENU_RIGHT);
+        lastEncoderCount = encoderCount;
       }else{
         menuHelper.UpdateDisplay();
       }
@@ -268,29 +287,43 @@ void potLoop(void *pvParameters){
 }
 
 void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(115200);
-  Serial.setDebugOutput(true);
-  Serial.println("Starting up");
+  // put your setup code here, to run once:¨
+  //#ifndef USE_OLED
+    Serial.begin(115200);
+    Serial.setDebugOutput(true);
+  //#endif
+
+  // Initialize OLED
+  #ifdef USE_OLED
+    OledWire.setPins(SDA, SCL);
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, true);
+    display.clearDisplay();
+    display.setTextColor(1);
+    display.println("SUPERSONIC QUANTUMBOX");
+    display.display();
+    display.setFont(&Picopixel);
+
+    debugPrint("OLED initialized");
+  #endif
 
   // Initialize the strip
   #ifdef USE_PIXELS
     strip.Begin();
     strip.Show();
-    Serial.println("Strip initialized");
+    debugPrint("Strip initialized");
   #endif
 
   // Initialize the encoder
   #ifdef USE_ENCODER
     encoder.attachHalfQuad(ENC_A, ENC_B);
     encoder.clearCount();
-    Serial.println("Encoder initialized");
     pinMode(ENC_SW, INPUT_PULLUP);
+    debugPrint("Encoder initialized");
   #endif
 
   // Initialize I2S
   install_i2s();
-  Serial.println("I2S initialized");
+  debugPrint("I2S initialized");
 
   // Initialize the pots
   analogSetAttenuation(ADC_11db);
@@ -301,17 +334,7 @@ void setup() {
       pots[i] = analogRead(potPins[i]);
     }
   }
-  Serial.println("Pots initialized");
-
-  // Initialize OLED
-  #ifdef USE_OLED
-    OledWire.setPins(SDA, SCL);
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, true);
-    display.clearDisplay();
-    display.setTextColor(1);
-    display.display();
-    Serial.println("OLED initialized");
-  #endif
+  debugPrint("Pots initialized");
 
   // Initialize LED filament
   #ifdef USE_LEDS
@@ -324,26 +347,38 @@ void setup() {
     ledcAttachPin(LED2, 1);
     ledcSetup(1, 1000, 8);
     ledcWrite(1, 0);
-    Serial.println("LED initialized");
+    debugPrint("LEDs initialized");
   #endif
 
   // Start the audio task
   psramInit();
-  Serial.println("PSRAM initialized");
-  delayEffect.init();
+  debugPrint("PSRAM initialized");
+
+  // Initialize effects
+  for(int i = 0; i < numEffects; i++){
+    effects[i]->init();
+  }
   
-  delay(3000);
+  
+  delay(1000);
   // Start audio task
-  xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
-  Serial.println("AudioTask started");
-  
-  // Start peripheral task
-  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 2, NULL);
-  Serial.println("PeripheralTask started");
+  xTaskCreate(AudioTask, "AudioTask", 100000, NULL, 10, NULL);
+  //display.clearDisplay();
+  //display.setCursor(0, 4);
+  debugPrint("Audio task started");
+
+  delay(1000);
 
   // Start pot task
   xTaskCreate(potLoop, "potLoop", 1000, NULL, 1, NULL);
-}
+  debugPrint("PotLoop started");
+
+  delay(1000);
+  // Start peripheral task
+  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 2, NULL);
+  // Do not use display after this point, it is used by the peripheral task
+
+}  
 
 void loop() {
   delay(50000);
