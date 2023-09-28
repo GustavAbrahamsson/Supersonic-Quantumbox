@@ -80,6 +80,7 @@ float avgDspTime = 0;
 // True: true bypass, the signal is skipping the pedal
 // False: the signal is passing through the pedal
 bool trueBypass = false;
+bool mainSwitchState = false;
 
 // Neopixel
 #ifdef USE_PIXELS
@@ -204,21 +205,6 @@ void PeripheralTask(void *pvParameters){
       encoderButton = !digitalRead(ENC_SW);
     #endif
 
-    // write to neopixels
-    #ifdef USE_PIXELS
-      // Switch on/off one of the neopixels to show when the signal is passing through the signal
-      if(!trueBypass) strip.SetPixelColor(0, pixelColors[0]);
-      else strip.SetPixelColor(0, RgbColor(0,0,0));
-
-      strip.SetPixelColor(1, pixelColors[1]);
-      strip.Show();
-    #endif
-
-    // Check the state of the main switch
-    #ifdef USE_TRUE_BP
-      trueBypass = digitalRead(TRUE_BP);
-    #endif
-
     // write to OLED
     #ifdef USE_OLED
       display.clearDisplay();
@@ -270,6 +256,12 @@ void PeripheralTask(void *pvParameters){
 }
 
 void potLoop(void *pvParameters){
+  TickType_t LastWakeTime = xTaskGetTickCount();
+  uint16_t taskFrequency = 100; // Hz
+  uint16_t taskMillis = 1000.0 / taskFrequency;
+
+  const TickType_t xFrequency = pdMS_TO_TICKS(taskMillis);
+
   // FIR filter for smoothing pots
   while(1){
     for (int i = 0; i < 6; i++)
@@ -278,7 +270,23 @@ void potLoop(void *pvParameters){
         pots[i] = pots[i]*(0.9f) + analogRead(potPins[i])*(0.1f*F_POTS);
       }
     }
-    delay(10);
+
+    // write to neopixels
+    #ifdef USE_PIXELS
+      bool newSwitch = digitalRead(TRUE_BP);
+      // If the switch has changed state
+      if(newSwitch != mainSwitchState){
+        mainSwitchState = newSwitch;
+        // Red for "active"
+        if (newSwitch) strip.SetPixelColor(0, pixelColors[0]);
+        else strip.SetPixelColor(0, RgbColor(0,0,0));
+        
+        strip.SetPixelColor(1, pixelColors[1]);
+        strip.Show();
+      }
+    #endif
+
+    vTaskDelayUntil(&LastWakeTime, xFrequency);
   }
 }
 
