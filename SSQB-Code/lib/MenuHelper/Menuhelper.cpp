@@ -22,8 +22,10 @@ void MenuHelper::HandleInput(inputEvent e){
         break;
     case MENU_PARAM_VIEW:
         CurrentState = &paramViewState;
+        break;
     case MENU_DEBUG_SCREEN:
         CurrentState = &debugScreenState;
+        break;
     // case MENU_PARAM_EDIT:
     //     CurrentState = &paramEditState;
     case MENU_STAY:
@@ -155,27 +157,3 @@ void ParamViewState::Draw(PedalContext * ctx){
     d->display();
 }
 
-
-/**
-void MenuHelper::GoToEffectView(uint32_t effectNum){
-    CurrentView = MENU_EFFECT_VIEW;
-    CurrentEffectNum = effectNum;
-
-    display->setCursor(0, 0);
-    display->println(effects[effectNum]->getName());
-    display->setFont(&Picopixel);
-    display->drawFastHLine(0, 10, 128, 1);
-    display->setCursor(0, 20);
-    effects[effectNum]->Draw(display);
-}
-
-
-void MenuHelper::UpdateDisplay(){
-
-    if(CurrentView == MENU_EFFECT_VIEW){
-        display->writeFillRect(0, 11, 128, 64-11, BLACK);
-        effects[CurrentEffectNum]->Draw(display);
-    }
-}
-
-**/

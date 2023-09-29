@@ -2,9 +2,11 @@
 #include <NeoPixelBus.h>
 #include <ESP32Encoder.h>
 #include "driver/i2s.h"
-#include "dsps_fft2r.h"
+//#include "dsps_fft2r.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
+
+#pragma GCC diagnostic warning "-Wpedantic" // Enable pedantic warnings for own libraries
 
 #include <MenuHelper.h>
 
@@ -24,7 +26,7 @@
 #define USE_OLED
 #define USE_ENCODER
 #define USE_PIXELS
-#define USE_LEDS
+//#define USE_LEDS
 
 // Set to true to enable pot
 bool POTS_ENABLED[6] = {true, true, true, false, false, false};
@@ -84,7 +86,7 @@ PotStruct potStruct[] = {
 
 int32_t i2s_write_buff[BUFFSIZE*2];
 int32_t i2s_read_buff[BUFFSIZE*2];
-uint32_t n = 0;
+uint32_t n = 0;  //Counting samples for some reason... should be removed 
 float avgDspTime = 0;
 
 // Neopixel
@@ -103,8 +105,13 @@ float avgDspTime = 0;
 
 // potentiometers
 float pots[6];
-#define F_POTS 1.0f/8196.0f
+#define F_POTS (1.0f/8196.0f)
 gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
+
+//deadband for pots
+bool potsChanged[6] = {false, false, false, false, false, false};
+uint32_t potsLastChanged[6] = {0, 0, 0, 0, 0, 0};
+#define POTS_CHANGED_THRESHOLD 0.03f
 
 // OLED
 #ifdef USE_OLED
@@ -145,9 +152,11 @@ void install_i2s(){
     .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
     .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, 
     .dma_buf_count = 4,
     .dma_buf_len = BUFFSIZE,
     .use_apll = true,
+    .tx_desc_auto_clear = true,
     .mclk_multiple = I2S_MCLK_MULTIPLE_256,
   };
 
@@ -203,7 +212,6 @@ void AudioTask(void *pvParameters){
     avgDspTime = (avgDspTime * 0.95f) + (DSPpct * 0.05f);
 
     // Write to I2S
-    bytes_written;
     ESP_ERROR_CHECK(i2s_write(I2S_NUM, (const char*) &i2s_write_buff, BUFFSIZE *2* sizeof(int32_t), &bytes_written, portMAX_DELAY));
   }
 }
@@ -212,7 +220,7 @@ void PeripheralTask(void *pvParameters){
 
   
   #ifdef USE_OLED
-    uint32_t maxRam = ESP.getPsramSize();
+    //uint32_t maxRam = ESP.getPsramSize();
     
     int32_t lastEncoderCount = 0;
     menuHelper = MenuHelper(&ctx);
@@ -279,7 +287,25 @@ void potLoop(void *pvParameters){
     for (int i = 0; i < 6; i++)
     {
       if(POTS_ENABLED[i]){
-        pots[i] = pots[i]*(0.9f) + analogRead(potPins[i])*(0.1f*F_POTS);
+        float oldVal = pots[i];
+        float newVal = analogRead(potPins[i])*F_POTS;
+
+        // Linear for a short amount of time after a change
+        if (potsChanged[i]){
+          if (millis() - potsLastChanged[i] < 500){
+            pots[i] = newVal;
+          } else {
+            potsChanged[i] = false;
+          }
+        }
+
+        // If the pot has changed, update the value, reset time
+        if(abs(newVal - oldVal) > POTS_CHANGED_THRESHOLD){
+          potsChanged[i] = true;
+          pots[i] = newVal;
+          potsLastChanged[i] = millis();
+        }
+
       }
     }
     delay(10);
@@ -362,7 +388,7 @@ void setup() {
   
   delay(1000);
   // Start audio task
-  xTaskCreate(AudioTask, "AudioTask", 100000, NULL, 10, NULL);
+  xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
   //display.clearDisplay();
   //display.setCursor(0, 4);
   debugPrint("Audio task started");

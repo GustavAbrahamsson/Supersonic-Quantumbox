@@ -227,11 +227,6 @@ class Saturation : public GenericEffect{
             display->print("EVEN: ");
             display->print(InputValues[3]);
 
-            for (int i = 0; i++; i < 1){
-                //display->setCursor(0, 10*(i+1));
-                //display->print(inputNames[i]);
-                //display->print(InputValues[i]);
-            }
             drawLine_box(0, 32, 63, 32); // x-axis
             drawLine_box(32, 0, 32, 63); // y-axis
 

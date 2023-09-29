@@ -60,10 +60,6 @@ public:
     menuState HandleInput(inputEvent, PedalContext *);
 };
 
-class ParamEditState : public ScreenState
-{
-};
-
 class DebugScreenState : public ScreenState
 {
 public:
@@ -78,7 +74,7 @@ class MenuHelper
 private:
     // State variables
     ScreenState *CurrentState;
-    
+
     EffectViewState effectViewState;
     ParamViewState paramViewState;
     // ParamEditState paramEditState;
