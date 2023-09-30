@@ -99,7 +99,7 @@ volatile bool trueBypass = false;
 // Neopixel
 #ifdef USE_PIXELS
   int pixelCount = 2;
-  RgbColor pixelColors[] = {RgbColor(64,0,0), RgbColor(0,0,0)};
+  RgbColor pixelColors[] = {RgbColor(32,0,0), RgbColor(0,0,0)};
   NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(pixelCount, PIXELPIN);
 #endif
 
@@ -119,6 +119,19 @@ gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
 bool potsChanged[6] = {false, false, false, false, false, false};
 uint32_t potsLastChanged[6] = {0, 0, 0, 0, 0, 0};
 #define POTS_CHANGED_THRESHOLD 0.03f
+
+// FreeRTOS semaphore (mutex) to control which task has access to the above inputs
+SemaphoreHandle_t xPotsMutex;
+
+// Input
+int32_t lastEncoderCount = 0;
+uint32_t encoderButtonCount = 0;
+bool buttonHeld = false;
+
+// FreeRTOS semaphore (mutex) to control which task has access to the above inputs
+SemaphoreHandle_t xEncoderMutex;
+
+
 
 // OLED
 #ifdef USE_OLED
@@ -252,8 +265,97 @@ void AudioTask(void *pvParameters){
   }
 }
 
-void PeripheralTask(void *pvParameters){
+void displayTask(void *pvParameters){
   TickType_t LastWakeTime = xTaskGetTickCount();
+  float taskFrequency = 5; // Hz
+  float taskMillis = 1000.0 / taskFrequency;
+  const TickType_t xFrequency = pdMS_TO_TICKS(taskMillis);
+  
+  
+  while(1){
+    // Attempt to access encoder variables, if unable, wait until they are free
+    xSemaphoreTake(xEncoderMutex, portMAX_DELAY);
+  
+    if(!encoderButton && encoderButtonCount > 0 && encoderButtonCount < 5 && !buttonHeld){
+      menuHelper.HandleInput(MENU_PRESS);
+      encoderButtonCount = 0;
+    }else if (encoderButton && encoderButtonCount >= 5 && !buttonHeld){
+      menuHelper.HandleInput(MENU_HOLD);
+      buttonHeld = true;
+    }else if (!encoderButton && buttonHeld){
+      encoderButtonCount = 0;
+      buttonHeld = false;
+    }else if (encoderCount > lastEncoderCount){
+      menuHelper.HandleInput(MENU_LEFT);
+      lastEncoderCount += 1;
+    }else if (encoderCount < lastEncoderCount){
+      menuHelper.HandleInput(MENU_RIGHT);
+      lastEncoderCount -= 1;
+    }else{
+      menuHelper.UpdateDisplay();
+    }
+    
+    // Give back access and let other tasks use the variables
+    xSemaphoreGive(xEncoderMutex);
+
+    //write to LED filaments
+    #ifdef USE_LEDS
+      ledcWrite(0, ledBrightness[0]);
+      ledcWrite(1, ledBrightness[1]);
+    #endif
+
+
+    // vTaskDelayUntil(&LastWakeTime, xFrequency);
+    vTaskDelay(xFrequency);
+  }
+}
+
+void inputHandlerTask(void *pvParameters){
+  TickType_t LastWakeTime = xTaskGetTickCount();
+  float taskFrequency = 1; // Hz
+  float taskMillis = 1000.0 / taskFrequency;
+  const TickType_t xFrequency = pdMS_TO_TICKS(taskMillis);
+
+  while(1){
+    
+    // Attempt to access potentiometer variables, if unable, wait until they are free
+    // xSemaphoreTake(xPotsMutex, portMAX_DELAY);
+
+    // Send pot values to effects
+    for(int i = 0; i<6; i++){
+      if(POTS_ENABLED[i]){
+        int8_t effectNum = potToEffect[i];
+        if(effectNum != -1 && potsChanged[i] && effects[effectNum]->getNumInputs() > i)
+          effects[effectNum]->setInputValue(i, pots[i]);        
+      }
+    }
+
+    
+    // Give back access and let other tasks use the variables
+    // xSemaphoreGive(xPotsMutex);
+
+    // Read encoder
+    #ifdef USE_ENCODER
+      // Attempt to access encoder variables, if unable, wait until they are free
+      xSemaphoreTake(xEncoderMutex, portMAX_DELAY);
+
+      encoderCount = encoder.getCount()/2;
+      encoderButton = !digitalRead(ENC_SW);
+      encoderButtonCount += encoderButton;
+
+      // Give back access and let other tasks use the variables
+      xSemaphoreGive(xEncoderMutex);
+
+    #endif
+
+    // vTaskDelayUntil(&LastWakeTime, xFrequency);
+    vTaskDelay(xFrequency);
+  }
+}
+
+
+void PeripheralTask(void *pvParameters){
+  // TickType_t LastWakeTime = xTaskGetTickCount();
   float taskFrequency = 5; // Hz
   float taskMillis = 1000.0 / taskFrequency;
   const TickType_t xFrequency = pdMS_TO_TICKS(taskMillis);
@@ -287,7 +389,6 @@ void PeripheralTask(void *pvParameters){
 
     // write to OLED
     #ifdef USE_OLED
-
       if(!encoderButton && encoderButtonCount > 0 && encoderButtonCount < 5 && !buttonHeld){
         menuHelper.HandleInput(MENU_PRESS);
         encoderButtonCount = 0;
@@ -323,7 +424,7 @@ void PeripheralTask(void *pvParameters){
 
 void potLoop(void *pvParameters){
   TickType_t LastWakeTime = xTaskGetTickCount();
-  uint16_t taskFrequency = 100; // Hz
+  uint16_t taskFrequency = 10; // Hz
   uint16_t taskMillis = 1000.0 / taskFrequency;
   const TickType_t xFrequency = pdMS_TO_TICKS(taskMillis);
 
@@ -364,6 +465,12 @@ void potLoop(void *pvParameters){
 void setup() {
 
   delay(3000); // If it crashes after the delay, there is time to upload
+
+  // Init mutex
+  xEncoderMutex = xSemaphoreCreateMutex();
+  xPotsMutex = xSemaphoreCreateMutex();
+  
+  xSemaphoreGive(xEncoderMutex);
 
   // put your setup code here, to run once:¨
   //#ifndef USE_OLED
@@ -409,6 +516,11 @@ void setup() {
   #ifdef USE_TRUE_BP
     pinMode(TRUE_BP, INPUT);
     trueBypass = digitalRead(TRUE_BP);
+    if (trueBypass) strip.SetPixelColor(0, pixelColors[0]);
+    else strip.SetPixelColor(0, RgbColor(0,0,0));
+    strip.SetPixelColor(1, pixelColors[1]);
+    strip.Show();
+    
     attachInterrupt(digitalPinToInterrupt(TRUE_BP), switchISR, CHANGE);
     debugPrint("ISR initialized");
   #endif
@@ -461,10 +573,16 @@ void setup() {
   debugPrint("PotLoop started");
 
   delay(1000);
-  // Start peripheral task
-  // TODO: Split updating display and handling input into two tasks
-  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 1, NULL);
-  // Do not use display after this point, it is used by the peripheral task
+
+  // xTaskCreate(PeripheralTask, "PeripheralTask", 100000, NULL, 1, NULL);
+
+  xTaskCreate(inputHandlerTask, "inputHandlerTask", 1000000, NULL, 1, NULL);
+  // debugPrint("InputHandler started");
+
+  delay(1000);
+  
+  xTaskCreate(displayTask, "displayTask", 1000000, NULL, 1, NULL);
+  // debugPrint("displayTask started");
 
   delay(1000);
 
