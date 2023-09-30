@@ -8,8 +8,9 @@ This pedal is an experiment in digital sound processing, powered by an ESP32-S2 
 ## Todo
 This project is still WIP, alot of things can be improved to make the pedal as easy and fun as possible.
 
-- [ ] Menu system for managing multiple effects at the same time
-- [ ] Nice looking and sturdy enclosure
+- [x] Menu system for managing multiple effects at the same time
+- [x] Nice looking and sturdy enclosure
+- [ ] Add lots different of effects
 - [ ] Expansion port for expression pedals, switches and more
 - [ ] PCB revision with ESP32-S3, better power supply filtering, footprint fixes
 - [ ] Wi-Fi configuration?
