@@ -26,8 +26,6 @@ void MenuHelper::HandleInput(inputEvent e){
     case MENU_DEBUG_SCREEN:
         CurrentState = &debugScreenState;
         break;
-    // case MENU_PARAM_EDIT:
-    //     CurrentState = &paramEditState;
     case MENU_STAY:
         return;
     default:
@@ -63,7 +61,7 @@ menuState EffectViewState::HandleInput(inputEvent e, PedalContext * ctx){
     case MENU_PRESS:
         return MENU_PARAM_VIEW;
     case MENU_HOLD:
-        // ctx->effects[CurrentEffectNum]->Mute();
+        //ctx->effects[ctx->CurrentEffectNum]->mute(); TODO
         break;
     default:
         break;
@@ -75,9 +73,12 @@ menuState EffectViewState::HandleInput(inputEvent e, PedalContext * ctx){
 void EffectViewState::Draw(PedalContext * ctx){
     Adafruit_SSD1306 * d = ctx->display;
     d->setFont(NULL);
-    d->setCursor(0, 0);
+    d->setCursor(3, 0);
     d->clearDisplay();
-    d->println(ctx->effects[ctx->CurrentEffectNum]->getName());
+    d->print("< ");
+    d->print(ctx->effects[ctx->CurrentEffectNum]->getName());
+    d->setCursor(120, 0);
+    d->println("<");
     d->setFont(&Picopixel);
     d->drawFastHLine(0, 10, 128, 1);
     d->setCursor(0, 20);
@@ -88,6 +89,7 @@ void EffectViewState::Draw(PedalContext * ctx){
 // Debug View state
 void DebugScreenState::Enter(PedalContext *ctx)
 {
+    ctx->CurrentEffectNum = -1;
     Draw(ctx);
 }
 
@@ -113,6 +115,7 @@ menuState DebugScreenState::HandleInput(inputEvent e, PedalContext * ctx){
     switch (e)
     {
     case MENU_LEFT:
+        ctx->CurrentEffectNum = 0;
         return MENU_EFFECT_VIEW;
     default:
         break;
@@ -142,10 +145,14 @@ menuState ParamViewState::HandleInput(inputEvent e, PedalContext * ctx){
 void ParamViewState::Draw(PedalContext * ctx){
     Adafruit_SSD1306 * d = ctx->display;
     d->setFont(NULL);
-    d->setCursor(0, 0);
+    d->setCursor(3, 0);
     d->clearDisplay();
-    d->println(ctx->effects[ctx->CurrentEffectNum]->getName());
-    d->setFont(&Picopixel);
+    d->print("< ");
+    d->print(ctx->effects[ctx->CurrentEffectNum]->getName());
+    d->print(" - Params");
+    d->setCursor(120, 0);
+    d->println("<");
+    //d->setFont(&Picopixel);
     d->drawFastHLine(0, 10, 128, 1);
     d->setCursor(0, 20);
     uint32_t num_p = ctx->effects[ctx->CurrentEffectNum]->getNumInputs();

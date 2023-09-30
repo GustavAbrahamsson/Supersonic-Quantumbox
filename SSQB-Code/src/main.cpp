@@ -7,6 +7,8 @@
 #include "Adafruit_SSD1306.h"
 
 #pragma GCC diagnostic warning "-Wpedantic" // Enable pedantic warnings for own libraries
+#pragma GCC optimize("O3")                  // Optimize for speed
+#pragma GCC optimize("fast-math")           // Enable fast math (Lower accuracy)
 
 #include <MenuHelper.h>
 
@@ -69,14 +71,9 @@ GenericEffect * effects[] = {
 
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
-// Bindings for each pot (Effect number, parameter number)
-PotStruct potStruct[] = {
-    {1, 0},
-    {1, 1},
-    {1, 2},
-    {-1, 0},
-    {-1, 0},
-    {-1, 0}};
+// Bindings for each pot 
+// potToEffect[potNum] = effectNum
+int8_t potToEffect[] = {1, 1, 1, 1, 1, 1};
 
 // DSP variables
 #define I2S_NUM   I2S_NUM_0
@@ -121,7 +118,6 @@ uint32_t potsLastChanged[6] = {0, 0, 0, 0, 0, 0};
   PedalContext ctx = {
     effects,
     numEffects,
-    potStruct,
     &display,
     0,
     0
@@ -223,6 +219,7 @@ void PeripheralTask(void *pvParameters){
     //uint32_t maxRam = ESP.getPsramSize();
     
     int32_t lastEncoderCount = 0;
+    uint32_t encoderButtonCount = 0;
     menuHelper = MenuHelper(&ctx);
   #endif
 
@@ -231,11 +228,9 @@ void PeripheralTask(void *pvParameters){
     // send pot values to effects
     for(int i = 0; i<6; i++){
       if(POTS_ENABLED[i]){
-        int8_t effectNum = potStruct[i].effectNum;
-        uint8_t paramNum = potStruct[i].paramNum;
-
-        if(effectNum != -1)
-          effects[effectNum]->setInputValue(paramNum, pots[i]);        
+        int8_t effectNum = potToEffect[i];
+        if(effectNum != -1 && potsChanged[i] && effects[effectNum]->getNumInputs() > i)
+          effects[effectNum]->setInputValue(i, pots[i]);        
       }
     }
     
@@ -244,6 +239,7 @@ void PeripheralTask(void *pvParameters){
     #ifdef USE_ENCODER
       encoderCount = encoder.getCount()/2;
       encoderButton = !digitalRead(ENC_SW);
+      encoderButtonCount += encoderButton;
     #endif
 
     // write to neopixels
@@ -256,19 +252,31 @@ void PeripheralTask(void *pvParameters){
     // write to OLED
     #ifdef USE_OLED
 
-      if(encoderButton){
+      if(!encoderButton && encoderButtonCount > 0 && encoderButtonCount < 10){
         menuHelper.HandleInput(MENU_PRESS);
-      }else if(encoderCount > lastEncoderCount){
+        encoderButtonCount = 0;
+      }
+      else if (!encoderButton && encoderButtonCount > 10)
+      {
+        menuHelper.HandleInput(MENU_HOLD);
+        encoderButtonCount = 0;
+      }
+      else if (encoderCount > lastEncoderCount)
+      {
         menuHelper.HandleInput(MENU_LEFT);
-        lastEncoderCount = encoderCount;
-      }else if(encoderCount < lastEncoderCount){
+        lastEncoderCount += 1;
+      }
+      else if (encoderCount < lastEncoderCount)
+      {
         menuHelper.HandleInput(MENU_RIGHT);
-        lastEncoderCount = encoderCount;
-      }else{
+        lastEncoderCount -= 1;
+      }
+      else
+      {
         menuHelper.UpdateDisplay();
       }
-      
-    #endif
+
+#endif
 
     //write to LED filaments
     #ifdef USE_LEDS
@@ -303,6 +311,7 @@ void potLoop(void *pvParameters){
         if(abs(newVal - oldVal) > POTS_CHANGED_THRESHOLD){
           potsChanged[i] = true;
           pots[i] = newVal;
+          potToEffect[i] = ctx.CurrentEffectNum;
           potsLastChanged[i] = millis();
         }
 

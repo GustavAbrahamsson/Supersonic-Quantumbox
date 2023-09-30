@@ -28,7 +28,6 @@ typedef struct pedalContext
     // External variables
     GenericEffect **effects;
     uint32_t numEffects;
-    PotStruct *pots;
     Adafruit_SSD1306 *display;
     uint32_t CurrentEffectNum;
     uint32_t CurrentParamNum;
@@ -77,7 +76,6 @@ private:
 
     EffectViewState effectViewState;
     ParamViewState paramViewState;
-    // ParamEditState paramEditState;
     DebugScreenState debugScreenState;
 
     // External variables
