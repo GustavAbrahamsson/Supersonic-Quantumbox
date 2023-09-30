@@ -2,12 +2,19 @@
 #include <NeoPixelBus.h>
 #include <ESP32Encoder.h>
 #include "driver/i2s.h"
-#include "dsps_fft2r.h"
+//#include "dsps_fft2r.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
-#include <Fonts/Picopixel.h>
+
+#pragma GCC diagnostic warning "-Wpedantic" // Enable pedantic warnings for own libraries
+#pragma GCC optimize("O3")                  // Optimize for speed
+#pragma GCC optimize("fast-math")           // Enable fast math (Lower accuracy)
+
+#include <MenuHelper.h>
+
 #include <AudioBuffer.h>
 #include <GenericEffect.h>
+
 #include <Clip.h>
 #include <Meter.h>
 #include <DelayEffect.h>
@@ -24,8 +31,9 @@
 #define USE_LEDS
 #define USE_TRUE_BP
 
+
 // Set to true to enable pot
-bool POTS_ENABLED[6] = {true, true, true, false, false, true};
+bool POTS_ENABLED[6] = {true, true, true, false, false, false};
 
 // ----------------Pins-----------------------
 #define POT1      GPIO_NUM_1
@@ -66,6 +74,10 @@ GenericEffect * effects[] = {
 
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
+// Bindings for each pot 
+// potToEffect[potNum] = effectNum
+int8_t potToEffect[] = {1, 1, 1, 1, 1, 1};
+
 // DSP variables
 #define I2S_NUM   I2S_NUM_0
 #define BUFFSIZE  128
@@ -74,7 +86,7 @@ const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
 int32_t i2s_write_buff[BUFFSIZE*2];
 int32_t i2s_read_buff[BUFFSIZE*2];
-uint32_t n = 0;
+uint32_t n = 0;  //Counting samples for some reason... should be removed 
 float avgDspTime = 0;
 
 // True: true bypass, the signal is skipping the pedal
@@ -98,13 +110,35 @@ bool mainSwitchState = false;
 
 // potentiometers
 float pots[6];
-#define F_POTS 1.0f/8196.0f
+#define F_POTS (1.0f/8196.0f)
 gpio_num_t potPins[6] = {POT1, POT2, POT3, POT4, POT5, POT6};
+
+//deadband for pots
+bool potsChanged[6] = {false, false, false, false, false, false};
+uint32_t potsLastChanged[6] = {0, 0, 0, 0, 0, 0};
+#define POTS_CHANGED_THRESHOLD 0.03f
 
 // OLED
 #ifdef USE_OLED
   TwoWire OledWire = TwoWire(0);
   Adafruit_SSD1306 display(128, 64, &OledWire, -1);
+
+  PedalContext ctx = {
+    effects,
+    numEffects,
+    &display,
+    0,
+    0
+  };
+
+  MenuHelper menuHelper = NULL;
+#endif
+
+// Macro for debug output during startup
+#ifdef USE_OLED
+  #define debugPrint(x) {display.println(x); display.display();}
+#else
+  #define debugPrint(x) {Serial.println(x);}
 #endif
 
 // LED filaments
@@ -122,9 +156,11 @@ void install_i2s(){
     .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
     .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, 
     .dma_buf_count = 4,
     .dma_buf_len = BUFFSIZE,
     .use_apll = true,
+    .tx_desc_auto_clear = true,
     .mclk_multiple = I2S_MCLK_MULTIPLE_256,
   };
 
@@ -180,69 +216,68 @@ void AudioTask(void *pvParameters){
     avgDspTime = (avgDspTime * 0.95f) + (DSPpct * 0.05f);
 
     // Write to I2S
-    bytes_written;
     ESP_ERROR_CHECK(i2s_write(I2S_NUM, (const char*) &i2s_write_buff, BUFFSIZE *2* sizeof(int32_t), &bytes_written, portMAX_DELAY));
   }
 }
 
 void PeripheralTask(void *pvParameters){
 
-  uint32_t maxRam = ESP.getPsramSize();
-  int32_t menuPage = 0;
+  
+  #ifdef USE_OLED
+    //uint32_t maxRam = ESP.getPsramSize();
+    
+    int32_t lastEncoderCount = 0;
+    uint32_t encoderButtonCount = 0;
+    menuHelper = MenuHelper(&ctx);
+  #endif
 
   while(1){
 
-    //effects[2]->setInputValue(0, pots[0]);
-    //effects[2]->setInputValue(1, pots[1]);
-    //effects[2]->setInputValue(2, pots[2]);
+    // send pot values to effects
+    for(int i = 0; i<6; i++){
+      if(POTS_ENABLED[i]){
+        int8_t effectNum = potToEffect[i];
+        if(effectNum != -1 && potsChanged[i] && effects[effectNum]->getNumInputs() > i)
+          effects[effectNum]->setInputValue(i, pots[i]);        
+      }
+    }
     
-    delayEffect.setInputValue(0, pots[0]);
-    delayEffect.setInputValue(1, pots[1]);
 
     // Read encoder
     #ifdef USE_ENCODER
       encoderCount = encoder.getCount()/2;
       encoderButton = !digitalRead(ENC_SW);
+      encoderButtonCount += encoderButton;
     #endif
 
     // write to OLED
     #ifdef USE_OLED
-      display.clearDisplay();
-      display.setFont(NULL);
 
-      if(encoderCount <= -1)
-        menuPage = -1;
-      else if(encoderCount > numEffects-1)
-        menuPage = numEffects-1;
-      else
-        menuPage = encoderCount;
-
-      // Menu
-      if(menuPage == -1){
-        // diagnostics display
-        display.setCursor(0,0);
-        display.println("Diagnostics");
-        display.drawFastHLine(0, 10, 128, 1);
-        display.setFont(&Picopixel);
-        display.setCursor(0, 20);
-        display.println("Encoder: " + String(encoderCount));
-        display.println("Button: " + String(encoderButton));
-        display.println("Pots: " + String(pots[0]) + ", " + String(pots[1]) + ", " + String(pots[2]));
-        display.println("DSP %: " + String(avgDspTime*100));
-        display.println("PSRAM used: " + String(maxRam - ESP.getFreePsram()) + " / " + String(maxRam));
-      }else{
-        effects[menuPage]->Draw(&display);
-        display.setCursor(0, 0);
-        display.println(effects[menuPage]->getName());
-        if(effects[menuPage]->getName() != "Saturation"){
-            display.drawFastHLine(0, 10, 128, 1);
-        }
-        display.setFont(&Picopixel);
-        display.setCursor(0, 20);
+      if(!encoderButton && encoderButtonCount > 0 && encoderButtonCount < 10){
+        menuHelper.HandleInput(MENU_PRESS);
+        encoderButtonCount = 0;
       }
-      
-      display.display();
-    #endif
+      else if (!encoderButton && encoderButtonCount > 10)
+      {
+        menuHelper.HandleInput(MENU_HOLD);
+        encoderButtonCount = 0;
+      }
+      else if (encoderCount > lastEncoderCount)
+      {
+        menuHelper.HandleInput(MENU_LEFT);
+        lastEncoderCount += 1;
+      }
+      else if (encoderCount < lastEncoderCount)
+      {
+        menuHelper.HandleInput(MENU_RIGHT);
+        lastEncoderCount -= 1;
+      }
+      else
+      {
+        menuHelper.UpdateDisplay();
+      }
+
+#endif
 
     //write to LED filaments
     #ifdef USE_LEDS
@@ -267,7 +302,26 @@ void potLoop(void *pvParameters){
     for (int i = 0; i < 6; i++)
     {
       if(POTS_ENABLED[i]){
-        pots[i] = pots[i]*(0.9f) + analogRead(potPins[i])*(0.1f*F_POTS);
+        float oldVal = pots[i];
+        float newVal = analogRead(potPins[i])*F_POTS;
+
+        // Linear for a short amount of time after a change
+        if (potsChanged[i]){
+          if (millis() - potsLastChanged[i] < 500){
+            pots[i] = newVal;
+          } else {
+            potsChanged[i] = false;
+          }
+        }
+
+        // If the pot has changed, update the value, reset time
+        if(abs(newVal - oldVal) > POTS_CHANGED_THRESHOLD){
+          potsChanged[i] = true;
+          pots[i] = newVal;
+          potToEffect[i] = ctx.CurrentEffectNum;
+          potsLastChanged[i] = millis();
+        }
+
       }
     }
 
@@ -291,24 +345,38 @@ void potLoop(void *pvParameters){
 }
 
 void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(115200);
-  Serial.setDebugOutput(true);
-  Serial.println("Starting up");
+  // put your setup code here, to run once:¨
+  //#ifndef USE_OLED
+    Serial.begin(115200);
+    Serial.setDebugOutput(true);
+  //#endif
+
+  // Initialize OLED
+  #ifdef USE_OLED
+    OledWire.setPins(SDA, SCL);
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, true);
+    display.clearDisplay();
+    display.setTextColor(1);
+    display.println("SUPERSONIC QUANTUMBOX");
+    display.display();
+    display.setFont(&Picopixel);
+
+    debugPrint("OLED initialized");
+  #endif
 
   // Initialize the strip
   #ifdef USE_PIXELS
     strip.Begin();
     strip.Show();
-    Serial.println("Strip initialized");
+    debugPrint("Strip initialized");
   #endif
 
   // Initialize the encoder
   #ifdef USE_ENCODER
     encoder.attachHalfQuad(ENC_A, ENC_B);
     encoder.clearCount();
-    Serial.println("Encoder initialized");
     pinMode(ENC_SW, INPUT_PULLUP);
+    debugPrint("Encoder initialized");
   #endif
 
   // If the state of the switch (true bypass) is measured at pin 'TRUE_BP'
@@ -319,7 +387,7 @@ void setup() {
 
   // Initialize I2S
   install_i2s();
-  Serial.println("I2S initialized");
+  debugPrint("I2S initialized");
 
   // Initialize the pots
   analogSetAttenuation(ADC_11db);
@@ -330,17 +398,7 @@ void setup() {
       pots[i] = analogRead(potPins[i]);
     }
   }
-  Serial.println("Pots initialized");
-
-  // Initialize OLED
-  #ifdef USE_OLED
-    OledWire.setPins(SDA, SCL);
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, true);
-    display.clearDisplay();
-    display.setTextColor(1);
-    display.display();
-    Serial.println("OLED initialized");
-  #endif
+  debugPrint("Pots initialized");
 
   // Initialize LED filament
   #ifdef USE_LEDS
@@ -353,26 +411,38 @@ void setup() {
     ledcAttachPin(LED2, 1);
     ledcSetup(1, 1000, 8);
     ledcWrite(1, 0);
-    Serial.println("LED initialized");
+    debugPrint("LEDs initialized");
   #endif
 
   // Start the audio task
   psramInit();
-  Serial.println("PSRAM initialized");
-  delayEffect.init();
+  debugPrint("PSRAM initialized");
+
+  // Initialize effects
+  for(int i = 0; i < numEffects; i++){
+    effects[i]->init();
+  }
   
-  delay(3000);
+  
+  delay(1000);
   // Start audio task
   xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
-  Serial.println("AudioTask started");
-  
-  // Start peripheral task
-  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 2, NULL);
-  Serial.println("PeripheralTask started");
+  //display.clearDisplay();
+  //display.setCursor(0, 4);
+  debugPrint("Audio task started");
+
+  delay(1000);
 
   // Start pot task
   xTaskCreate(potLoop, "potLoop", 1000, NULL, 1, NULL);
-}
+  debugPrint("PotLoop started");
+
+  delay(1000);
+  // Start peripheral task
+  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 2, NULL);
+  // Do not use display after this point, it is used by the peripheral task
+
+}  
 
 void loop() {
   delay(50000);

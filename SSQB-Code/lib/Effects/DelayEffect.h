@@ -17,6 +17,15 @@ private:
 
     AudioBuffer<float> buffer = AudioBuffer<float>();
 
+    void SetDelays(){
+        uint32_t delay = (uint32_t)(MAX_DELAY * InputValues[0]);
+
+        for (int i = 0; i < NUM_CHANNELS; i++)
+        {
+            delayTimes[i] = delay * delaySteps[i];
+        }
+    }
+
 public:
     float DSP(float sample)
     {
@@ -40,9 +49,11 @@ public:
         // Consider https://ccrma.stanford.edu/~dattorro/EffectDesignPart1.pdf for reverb design
     }
 
-    void init()
+    // override
+    void init() 
     {
         buffer.init(MAX_DELAY);   
+        SetDelays();
     }
 
     void Draw(Adafruit_SSD1306 *display)
@@ -81,13 +92,9 @@ public:
     void setInputValue(uint32_t index, float value)
     {
         InputValues[index] = value;
-
         if(index == 0){
-            uint32_t delay = (uint32_t)(MAX_DELAY*InputValues[0]);
-
-            for(int i = 0; i < NUM_CHANNELS; i++){
-                delayTimes[i] = delay * delaySteps[i];
-            }
+            SetDelays();
         }
     }
+
 };
