@@ -4,13 +4,16 @@
 class Meter : public GenericEffect
 {
 private:
-    String name = "Level Meter";
-    float InputValues[0];
+    String name = "VU Meter";
     float max = 0;
 
 public:
     float DSP(float sample)
     {
+        if(this->pass){
+            max = 0.0f;
+            return sample;
+        }
         // Max sample with decay
         if (sample > max)
         {
@@ -60,13 +63,7 @@ public:
         }
     }
 
-    float getInputValue(uint32_t index)
-    {
-        return InputValues[index];
-    }
+    float getInputValue(uint32_t index) {return 0.0f;}
 
-    void setInputValue(uint32_t index, float value)
-    {
-        InputValues[index] = value;
-    }
+    void setInputValue(uint32_t index, float value) {}
 };

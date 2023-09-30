@@ -7,10 +7,15 @@ class Gain : public GenericEffect{
         String name = "Gain";
         float InputValues[1] = {1.0f/MAXGAIN};
         float gain = 1.0f;
+        bool pass = false;
 
     public:
 
         float DSP(float sample){
+            // Pass through
+            if (this->pass)
+                return sample;
+                
             // Gain 
             return sample * gain;
         }

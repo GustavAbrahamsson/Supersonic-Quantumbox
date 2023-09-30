@@ -61,7 +61,7 @@ menuState EffectViewState::HandleInput(inputEvent e, PedalContext * ctx){
     case MENU_PRESS:
         return MENU_PARAM_VIEW;
     case MENU_HOLD:
-        //ctx->effects[ctx->CurrentEffectNum]->mute(); TODO
+        ctx->effects[ctx->CurrentEffectNum]->passTroughToggle(); 
         break;
     default:
         break;
@@ -73,12 +73,15 @@ menuState EffectViewState::HandleInput(inputEvent e, PedalContext * ctx){
 void EffectViewState::Draw(PedalContext * ctx){
     Adafruit_SSD1306 * d = ctx->display;
     d->setFont(NULL);
-    d->setCursor(3, 0);
+    d->setCursor(0, 0);
     d->clearDisplay();
     d->print("< ");
     d->print(ctx->effects[ctx->CurrentEffectNum]->getName());
     d->setCursor(120, 0);
     d->println("<");
+    if(ctx->effects[ctx->CurrentEffectNum]->pass)
+        d->drawFastHLine(6,3,111, WHITE);
+
     d->setFont(&Picopixel);
     d->drawFastHLine(0, 10, 128, 1);
     d->setCursor(0, 20);
@@ -145,7 +148,7 @@ menuState ParamViewState::HandleInput(inputEvent e, PedalContext * ctx){
 void ParamViewState::Draw(PedalContext * ctx){
     Adafruit_SSD1306 * d = ctx->display;
     d->setFont(NULL);
-    d->setCursor(3, 0);
+    d->setCursor(0, 0);
     d->clearDisplay();
     d->print("< ");
     d->print(ctx->effects[ctx->CurrentEffectNum]->getName());

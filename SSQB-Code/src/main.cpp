@@ -27,9 +27,9 @@
 
 #define USE_OLED
 #define USE_ENCODER
-#define USE_PIXELS
-#define USE_LEDS
-#define USE_TRUE_BP
+//#define USE_PIXELS
+//#define USE_LEDS
+//#define USE_TRUE_BP
 
 
 // Set to true to enable pot
@@ -66,9 +66,10 @@ Meter maxOutputMeter;
 Saturation saturationEffect;
 
 GenericEffect * effects[] = {
-  &MaxInputMeter, 
-  &delayEffect,
-  &maxOutputMeter, 
+  &MaxInputMeter,
+  &saturationEffect,
+  &maxOutputMeter,
+  &delayEffect, 
   &outputClip
   };
 
@@ -86,7 +87,6 @@ int8_t potToEffect[] = {1, 1, 1, 1, 1, 1};
 
 int32_t i2s_write_buff[BUFFSIZE*2];
 int32_t i2s_read_buff[BUFFSIZE*2];
-uint32_t n = 0;  //Counting samples for some reason... should be removed 
 float avgDspTime = 0;
 
 // True: true bypass, the signal is skipping the pedal
@@ -149,6 +149,11 @@ uint32_t potsLastChanged[6] = {0, 0, 0, 0, 0, 0};
 // --------------Functions--------------------
 
 void install_i2s(){
+  // Don't need these warnings, this code is from espressif docs
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+
   // I2S
   i2s_config_t i2s_config = {
     .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX), // Both TX and RX in master mode
@@ -172,6 +177,8 @@ void install_i2s(){
     .data_in_num = DIN
   };
 
+  #pragma GCC diagnostic pop
+
   ESP_ERROR_CHECK(i2s_driver_install(I2S_NUM, &i2s_config, 0, NULL));
   ESP_ERROR_CHECK(i2s_set_pin(I2S_NUM, &pin_config));
 }
@@ -181,7 +188,6 @@ void AudioTask(void *pvParameters){
   // Wait for input buffer to fill up
   delay(1000);
 
-  uint32_t n = 0;
   while(1){
 
     // Read from I2S
@@ -200,9 +206,6 @@ void AudioTask(void *pvParameters){
       {
         s = effects[e]->DSP(s);
       }
-
-      // increment sample number
-      n++;
 
       int32_t si = s*F_MUL;
       //Write sample to I2S buffer
@@ -229,6 +232,7 @@ void PeripheralTask(void *pvParameters){
     int32_t lastEncoderCount = 0;
     uint32_t encoderButtonCount = 0;
     menuHelper = MenuHelper(&ctx);
+    bool buttonHeld = false;
   #endif
 
   while(1){
@@ -253,31 +257,26 @@ void PeripheralTask(void *pvParameters){
     // write to OLED
     #ifdef USE_OLED
 
-      if(!encoderButton && encoderButtonCount > 0 && encoderButtonCount < 10){
+      if(!encoderButton && encoderButtonCount > 0 && encoderButtonCount < 5 && !buttonHeld){
         menuHelper.HandleInput(MENU_PRESS);
         encoderButtonCount = 0;
-      }
-      else if (!encoderButton && encoderButtonCount > 10)
-      {
+      }else if (encoderButton && encoderButtonCount >= 5 && !buttonHeld){
         menuHelper.HandleInput(MENU_HOLD);
+        buttonHeld = true;
+      }else if (!encoderButton && buttonHeld){
         encoderButtonCount = 0;
-      }
-      else if (encoderCount > lastEncoderCount)
-      {
+        buttonHeld = false;
+      }else if (encoderCount > lastEncoderCount){
         menuHelper.HandleInput(MENU_LEFT);
         lastEncoderCount += 1;
-      }
-      else if (encoderCount < lastEncoderCount)
-      {
+      }else if (encoderCount < lastEncoderCount){
         menuHelper.HandleInput(MENU_RIGHT);
         lastEncoderCount -= 1;
-      }
-      else
-      {
+      }else{
         menuHelper.UpdateDisplay();
       }
 
-#endif
+    #endif
 
     //write to LED filaments
     #ifdef USE_LEDS
@@ -442,7 +441,7 @@ void setup() {
   xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 2, NULL);
   // Do not use display after this point, it is used by the peripheral task
 
-}  
+}
 
 void loop() {
   delay(50000);

@@ -29,6 +29,11 @@ private:
 public:
     float DSP(float sample)
     {
+        // Pass through
+        if (this->pass){
+            buffer.write(0.0f);
+            return sample;
+        }
         // delay and feedback
         // Percussive elements are more pronounced
         float dry = sample * 0.5f;
@@ -81,16 +86,25 @@ public:
 
     String getInputName(uint32_t index)
     {
+        if(index > 1)
+            return "none";
+            
         return InputNames[index];
     }
 
     float getInputValue(uint32_t index)
     {
+        if(index > 1)
+            return 0.0f;
+
         return InputValues[index];
     }
 
     void setInputValue(uint32_t index, float value)
     {
+        if(index > 1)
+            return;
+
         InputValues[index] = value;
         if(index == 0){
             SetDelays();

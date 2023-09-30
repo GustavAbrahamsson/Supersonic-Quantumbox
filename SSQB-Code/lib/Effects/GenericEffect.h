@@ -8,6 +8,8 @@
 
 class GenericEffect{
     public:
+        bool pass = false;
+
         // DSP function
         virtual float DSP(float sample) = 0;
         
@@ -29,6 +31,17 @@ class GenericEffect{
         // set parameter values
         virtual void setInputValue(uint32_t index, float) = 0;
 
+        // Passthough toggle
+        void passTroughToggle(){
+            pass = !pass;
+        };
+
+        // get passthrough state
+        bool getPassTroughState(){
+            return pass;
+        };
+
+        // init function, called at startup (optional)
         virtual void init(){};
 
 };

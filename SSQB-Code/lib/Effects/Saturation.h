@@ -160,6 +160,10 @@ class Saturation : public GenericEffect{
             max_level = InputValues[0];
         }
 
+        // This is undefined code, but works on ESP32-s2 so it's (probably) fine
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+
         float f_sqrt(float f)
         // Calculates 1/sqrt(f) using quake alg, then sqrt(f) = f* 1/sqrt(f) 
         {
@@ -169,6 +173,7 @@ class Saturation : public GenericEffect{
 
             x2 = f * 0.5F;
             y = f;
+            
             i = *(long *)&y;           // evil floating point bit level hacking
             i = 0x5f3759df - (i >> 1); // what the fuck?
             y = *(float *)&i;
@@ -178,10 +183,14 @@ class Saturation : public GenericEffect{
             return f*y;
         }
 
+        #pragma GCC diagnostic pop
+
     public:
         float DSP(float sample){
             // See https://www.geogebra.org/calculator/ynjbbcu8 for equations
             // "smooth" part is modeled as an arc
+            if (this->pass)
+                return sample;
 
             bool neg = false;
             
@@ -232,8 +241,6 @@ class Saturation : public GenericEffect{
 
             display->drawRect(box_x0, box_y0, box_size_x, box_size_y, 1); // box
 
-            //drawLine_sample(0, 0, INT32_MAX / 2, INT32_MAX / 2);
-
             uint8_t last_y = 0;
 
             // feed -1 .. 1 into DSP, display on screen
@@ -276,10 +283,14 @@ class Saturation : public GenericEffect{
         }
 
         float getInputValue(uint32_t index){
+            if (index > numInputs-1)
+                return 0.0f;
             return InputValues[index];
         }
 
         void setInputValue(uint32_t index, float value){
+            if(index > numInputs-1)
+                return;
             InputValues[index] = value;
             updateCurve();              //Update curve parameters
         }

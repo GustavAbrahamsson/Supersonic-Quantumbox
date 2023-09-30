@@ -9,6 +9,10 @@ class Clip : public GenericEffect{
     public:
 
         float DSP(float sample){
+            // Pass through
+            if(this->pass)
+                return sample;
+
             // Clip me baby!
             float clip = InputValues[0]; 
         
@@ -47,10 +51,14 @@ class Clip : public GenericEffect{
         }
 
         float getInputValue(uint32_t index){
+            if (index > 0)
+                return 0.0f;
             return InputValues[index];
         }
 
         void setInputValue(uint32_t index, float value){
+            if (index > 0)
+                return;
             InputValues[index] = value;
         }
 };
