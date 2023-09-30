@@ -20,6 +20,7 @@
 #include <DelayEffect.h>
 #include <Saturation.h>
 #include <Gain.h>
+#include <Square.h>
 
 
 // --------------CONFIG-----------------------
@@ -64,12 +65,14 @@ Clip outputClip;
 DelayEffect delayEffect;
 Meter maxOutputMeter;
 Saturation saturationEffect;
+Square squareEffect;
 
 GenericEffect * effects[] = {
   &MaxInputMeter,
   &saturationEffect,
+  &squareEffect,
   &maxOutputMeter,
-  &delayEffect, 
+  //&delayEffect, 
   &outputClip
   };
 
@@ -438,6 +441,7 @@ void setup() {
 
   delay(1000);
   // Start peripheral task
+  // TODO: Split updating display and handling input into two tasks
   xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 2, NULL);
   // Do not use display after this point, it is used by the peripheral task
 

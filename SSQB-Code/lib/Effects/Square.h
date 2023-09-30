@@ -1,12 +1,12 @@
 #include "GenericEffect.h"
 
-// Simple gain
-class Gain : public GenericEffect{
+// Equivalent to infinite gain with a deadzoone
+class Square : public GenericEffect{
     private:
-        #define MAXGAIN 10.0f
-        String name = "Gain";
-        float InputValues[1] = {1.0f/MAXGAIN};
-        float gain = 1.0f;
+        String name = "Squarify";
+        float InputValues[1] = {0.2f};
+        float gain = 0.3f;
+        float deadzone = 0.003f;
 
     public:
 
@@ -15,8 +15,12 @@ class Gain : public GenericEffect{
             if (this->pass)
                 return sample;
                 
-            // Gain 
-            return sample * gain;
+            if (sample > deadzone)
+                return 1.0f*gain;
+            else if(sample < -deadzone)
+                return -1.0f*gain;
+            else
+                return 0.0f;
         }
 
         void Draw(Adafruit_SSD1306 * display){
@@ -36,7 +40,7 @@ class Gain : public GenericEffect{
         String getInputName(uint32_t index){
             switch(index){
                 case 0:
-                    return "Gain";
+                    return "Volume";
                 default:
                     return "Error";
             }
@@ -52,6 +56,6 @@ class Gain : public GenericEffect{
             if(index > 0)
                 return;
             InputValues[index] = value;
-            gain = InputValues[0]*MAXGAIN;
+            gain = InputValues[0];
         }
 };
