@@ -28,9 +28,9 @@
 
 #define USE_OLED
 #define USE_ENCODER
-//#define USE_PIXELS
+#define USE_PIXELS
 //#define USE_LEDS
-//#define USE_TRUE_BP
+#define USE_TRUE_BP
 
 
 // Set to true to enable pot
@@ -94,8 +94,7 @@ float avgDspTime = 0;
 
 // True: true bypass, the signal is skipping the pedal
 // False: the signal is passing through the pedal
-bool trueBypass = false;
-bool mainSwitchState = false;
+volatile bool trueBypass = false;
 
 // Neopixel
 #ifdef USE_PIXELS
@@ -148,6 +147,33 @@ uint32_t potsLastChanged[6] = {0, 0, 0, 0, 0, 0};
 #ifdef USE_LEDS
   int ledBrightness[] = {0, 0};
 #endif
+
+// Is executed every time the switch changes
+volatile uint32_t lastSwitchChange = 0;
+#define DEBOUNCE_TIME_MS 20
+void IRAM_ATTR switchISR() {
+    //display.println("MAIN SWITCH EVENT2");
+    //Serial.println("MAIN SWITCH EVENT 2");
+
+    
+    // Avoid bouncing by only allowing switch-changes at least DEBOUNCE_TIME_MS apart
+    if (millis() - lastSwitchChange > DEBOUNCE_TIME_MS){
+      lastSwitchChange = millis();
+      trueBypass = digitalRead(TRUE_BP);
+
+      // write to neopixels
+      #ifdef USE_PIXELS
+        // Red for "active"
+        if (trueBypass) strip.SetPixelColor(0, pixelColors[0]);
+        else strip.SetPixelColor(0, RgbColor(0,0,0));
+        
+        strip.SetPixelColor(1, pixelColors[1]);
+        strip.Show();
+      #endif
+    
+  }
+}
+
 
 // --------------Functions--------------------
 
@@ -227,7 +253,10 @@ void AudioTask(void *pvParameters){
 }
 
 void PeripheralTask(void *pvParameters){
-
+  TickType_t LastWakeTime = xTaskGetTickCount();
+  float taskFrequency = 5; // Hz
+  float taskMillis = 1000.0 / taskFrequency;
+  const TickType_t xFrequency = pdMS_TO_TICKS(taskMillis);
   
   #ifdef USE_OLED
     //uint32_t maxRam = ESP.getPsramSize();
@@ -249,7 +278,6 @@ void PeripheralTask(void *pvParameters){
       }
     }
     
-
     // Read encoder
     #ifdef USE_ENCODER
       encoderCount = encoder.getCount()/2;
@@ -287,8 +315,9 @@ void PeripheralTask(void *pvParameters){
       ledcWrite(1, ledBrightness[1]);
     #endif
 
-    // delay
-    delay(200);
+    // vTaskDelayUntil(&LastWakeTime, xFrequency);
+    vTaskDelay(xFrequency);
+
   }
 }
 
@@ -296,7 +325,6 @@ void potLoop(void *pvParameters){
   TickType_t LastWakeTime = xTaskGetTickCount();
   uint16_t taskFrequency = 100; // Hz
   uint16_t taskMillis = 1000.0 / taskFrequency;
-
   const TickType_t xFrequency = pdMS_TO_TICKS(taskMillis);
 
   // FIR filter for smoothing pots
@@ -327,26 +355,16 @@ void potLoop(void *pvParameters){
       }
     }
 
-    // write to neopixels
-    #ifdef USE_PIXELS
-      bool newSwitch = digitalRead(TRUE_BP);
-      // If the switch has changed state
-      if(newSwitch != mainSwitchState){
-        mainSwitchState = newSwitch;
-        // Red for "active"
-        if (newSwitch) strip.SetPixelColor(0, pixelColors[0]);
-        else strip.SetPixelColor(0, RgbColor(0,0,0));
-        
-        strip.SetPixelColor(1, pixelColors[1]);
-        strip.Show();
-      }
-    #endif
-
     vTaskDelayUntil(&LastWakeTime, xFrequency);
   }
 }
 
+
+
 void setup() {
+
+  delay(3000); // If it crashes after the delay, there is time to upload
+
   // put your setup code here, to run once:¨
   //#ifndef USE_OLED
     Serial.begin(115200);
@@ -381,15 +399,19 @@ void setup() {
     debugPrint("Encoder initialized");
   #endif
 
-  // If the state of the switch (true bypass) is measured at pin 'TRUE_BP'
-  #ifdef USE_TRUE_BP
-    pinMode(TRUE_BP, INPUT_PULLUP);
-    trueBypass = digitalRead(TRUE_BP);
-  #endif
-
   // Initialize I2S
   install_i2s();
   debugPrint("I2S initialized");
+
+  delay(1000);
+
+  // If the state of the switch (true bypass) is measured at pin 'TRUE_BP'
+  #ifdef USE_TRUE_BP
+    pinMode(TRUE_BP, INPUT);
+    trueBypass = digitalRead(TRUE_BP);
+    attachInterrupt(digitalPinToInterrupt(TRUE_BP), switchISR, CHANGE);
+    debugPrint("ISR initialized");
+  #endif
 
   // Initialize the pots
   analogSetAttenuation(ADC_11db);
@@ -425,7 +447,6 @@ void setup() {
     effects[i]->init();
   }
   
-  
   delay(1000);
   // Start audio task
   xTaskCreate(AudioTask, "AudioTask", 10000, NULL, 10, NULL);
@@ -436,15 +457,18 @@ void setup() {
   delay(1000);
 
   // Start pot task
-  xTaskCreate(potLoop, "potLoop", 1000, NULL, 1, NULL);
+  xTaskCreate(potLoop, "potLoop", 10000, NULL, 1, NULL);
   debugPrint("PotLoop started");
 
   delay(1000);
   // Start peripheral task
   // TODO: Split updating display and handling input into two tasks
-  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 2, NULL);
+  xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 1, NULL);
   // Do not use display after this point, it is used by the peripheral task
 
+  delay(1000);
+
+  vTaskStartScheduler();
 }
 
 void loop() {
