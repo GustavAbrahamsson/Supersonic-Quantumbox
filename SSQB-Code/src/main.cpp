@@ -21,6 +21,7 @@
 #include <Saturation.h>
 #include <Gain.h>
 #include <Square.h>
+#include <NoiseGate.h>
 
 
 // --------------CONFIG-----------------------
@@ -66,11 +67,12 @@ DelayEffect delayEffect;
 Meter maxOutputMeter;
 Saturation saturationEffect;
 Square squareEffect;
+NoiseGate noiseGate;
 
 GenericEffect * effects[] = {
-  &MaxInputMeter,
+  &noiseGate,
   &saturationEffect,
-  &squareEffect,
+  //&squareEffect,
   &maxOutputMeter,
   //&delayEffect, 
   &outputClip
@@ -154,7 +156,6 @@ volatile uint32_t lastSwitchChange = 0;
 void IRAM_ATTR switchISR() {
     //display.println("MAIN SWITCH EVENT2");
     //Serial.println("MAIN SWITCH EVENT 2");
-
     
     // Avoid bouncing by only allowing switch-changes at least DEBOUNCE_TIME_MS apart
     if (millis() - lastSwitchChange > DEBOUNCE_TIME_MS){
