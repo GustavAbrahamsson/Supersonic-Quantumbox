@@ -22,6 +22,7 @@
 #include <Gain.h>
 #include <Square.h>
 #include <NoiseGate.h>
+#include <Peak.h>
 
 
 // --------------CONFIG-----------------------
@@ -68,10 +69,12 @@ Meter maxOutputMeter;
 Saturation saturationEffect;
 Square squareEffect;
 NoiseGate noiseGate;
+Peak peakEffect;
 
 GenericEffect * effects[] = {
   &noiseGate,
   &saturationEffect,
+  &peakEffect,
   //&squareEffect,
   &maxOutputMeter,
   //&delayEffect, 
@@ -140,7 +143,7 @@ uint32_t potsLastChanged[6] = {0, 0, 0, 0, 0, 0};
 
 // Macro for debug output during startup
 #ifdef USE_OLED
-  #define debugPrint(x) {display.println(x); display.display();}
+  #define debugPrint(x) {display.println(x); display.display(); log_i(x);}
 #else
   #define debugPrint(x) {Serial.println(x);}
 #endif
@@ -469,7 +472,8 @@ void setup() {
 
   delay(1000);
 
-  vTaskStartScheduler();
+  // TODO: This should probably not be done (it's alrady started)
+  //vTaskStartScheduler();
 }
 
 void loop() {
