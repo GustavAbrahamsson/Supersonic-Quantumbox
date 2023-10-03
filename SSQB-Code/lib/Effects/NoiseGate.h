@@ -7,7 +7,7 @@ class NoiseGate : public GenericEffect{
         float InputValues[1] = {0.0f};
         float sampleTracker = 0.0f;
         const float trackingConstant = 0.01f;
-        const float potScaling = 0.1f;
+        const float potScaling = 0.01f;
     public:
 
         float DSP(float sample){

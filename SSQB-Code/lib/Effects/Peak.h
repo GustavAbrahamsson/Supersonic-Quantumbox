@@ -15,12 +15,12 @@ class Peak : public GenericEffect{
 
         void calculateCoeffs(){
             // From Introduction to Signal Processing, Orfanidis pg 520
+            // With some modifications to the parameters
             // http://eceweb1.rutgers.edu/~orfanidi/intro2sp/2e/orfanidis-isp2e-1up.pdf 
 
-            beta = 0.1f/InputValues[1];
-            float w0 = InputValues[0]*PI*0.1f;
+            float w0 = InputValues[0]*PI*0.05f;
 
-            float b = 1.0f/(1.0f + beta);
+            float b = 0.1*InputValues[1]+0.9;
 
             num[0] = (1-b);
             num[2] = -(1-b);
@@ -52,7 +52,11 @@ class Peak : public GenericEffect{
         }
 
         void Draw(Adafruit_SSD1306 * display){
-            display->setCursor(0,30);
+            int peak = InputValues[0]*128.0f;
+            int spread = InputValues[1]*64.0f - 64;
+
+            display->drawLine(peak-spread, 64, peak, 24, WHITE);
+            display->drawLine(peak, 24, peak+spread, 64, WHITE);
         }
 
         void init(){
