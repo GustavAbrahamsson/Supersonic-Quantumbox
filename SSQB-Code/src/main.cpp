@@ -24,6 +24,7 @@
 #include <NoiseGate.h>
 #include <Peak.h>
 #include <DiffuserEffect.h>
+#include <Scope.h>
 
 
 // --------------CONFIG-----------------------
@@ -72,6 +73,7 @@ Square squareEffect;
 NoiseGate noiseGate;
 Peak peakEffect;
 DiffuserEffect diffuserEffect;
+Scope scopeEffect;
 
 GenericEffect * effects[] = {
   &noiseGate,
@@ -81,8 +83,9 @@ GenericEffect * effects[] = {
   //&squareEffect,
   &maxOutputMeter,
   //&delayEffect, 
-  &outputClip
-  };
+  &outputClip,
+  &scopeEffect,
+};
 
 const uint32_t numEffects = sizeof(effects)/sizeof(effects[0]);
 
