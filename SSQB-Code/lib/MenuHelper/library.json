@@ -1,0 +1,8 @@
+{
+    "name": "MenuHelper",
+    "build": {
+        "flags": [
+        "-O3"
+        ]
+    }
+}

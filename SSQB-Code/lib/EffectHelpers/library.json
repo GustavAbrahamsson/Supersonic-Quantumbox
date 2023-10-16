@@ -1,0 +1,9 @@
+{
+    "name": "EffectHelpers",
+    "build": {
+        "flags": [
+        "-O3",
+        "-ffast-math"
+        ]
+    }
+}

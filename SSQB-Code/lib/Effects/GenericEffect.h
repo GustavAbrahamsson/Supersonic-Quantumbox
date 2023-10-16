@@ -1,10 +1,10 @@
-#include "AudioBuffer.h"
+#ifndef GenericEffect_h
+#define GenericEffect_h
+
+#include "EffectHelpers.h"
 #include "Arduino.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
-
-#ifndef GenericEffect_h
-#define GenericEffect_h
 
 class GenericEffect{
     public:

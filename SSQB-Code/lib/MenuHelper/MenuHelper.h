@@ -1,6 +1,5 @@
 #pragma once
 #include "GenericEffect.h"
-#include "PotStruct.h"
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
 #include <Fonts/Picopixel.h>

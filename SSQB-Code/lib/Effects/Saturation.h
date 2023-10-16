@@ -160,31 +160,6 @@ class Saturation : public GenericEffect{
             max_level = InputValues[0];
         }
 
-        // This is undefined code, but works on ESP32-s2 so it's (probably) fine
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wstrict-aliasing"
-
-        float f_sqrt(float f)
-        // Calculates 1/sqrt(f) using quake alg, then sqrt(f) = f* 1/sqrt(f) 
-        {
-            long i;
-            float x2, y;
-            const float threehalfs = 1.5F;
-
-            x2 = f * 0.5F;
-            y = f;
-            
-            i = *(long *)&y;           // evil floating point bit level hacking
-            i = 0x5f3759df - (i >> 1); // what the fuck?
-            y = *(float *)&i;
-            y = y * (threehalfs - (x2 * y * y)); // 1st iteration
-            // y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
-
-            return f*y;
-        }
-
-        #pragma GCC diagnostic pop
-
     public:
         float DSP(float sample){
             // See https://www.geogebra.org/calculator/ynjbbcu8 for equations
