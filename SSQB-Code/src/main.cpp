@@ -6,15 +6,15 @@
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 
-#pragma GCC diagnostic warning "-Wpedantic" // Enable pedantic warnings for own libraries
+#pragma GCC diagnostic warning "-Wpedantic" // Enable pedantic warnings for own code
 #pragma GCC optimize("O3")                  // Optimize for speed
 #pragma GCC optimize("fast-math")           // Enable fast math (Lower accuracy)
 
+// Project libraries
 #include <MenuHelper.h>
-
-#include <AudioBuffer.h>
 #include <GenericEffect.h>
 
+// Effects
 #include <Clip.h>
 #include <Meter.h>
 #include <DelayEffect.h>
@@ -23,6 +23,7 @@
 #include <Square.h>
 #include <NoiseGate.h>
 #include <Peak.h>
+#include <DiffuserEffect.h>
 
 
 // --------------CONFIG-----------------------
@@ -70,11 +71,13 @@ Saturation saturationEffect;
 Square squareEffect;
 NoiseGate noiseGate;
 Peak peakEffect;
+DiffuserEffect diffuserEffect;
 
 GenericEffect * effects[] = {
   &noiseGate,
   &saturationEffect,
-  &peakEffect,
+  &diffuserEffect,
+  //&peakEffect,
   //&squareEffect,
   &maxOutputMeter,
   //&delayEffect, 
@@ -469,11 +472,6 @@ void setup() {
   // TODO: Split updating display and handling input into two tasks
   xTaskCreate(PeripheralTask, "PeripheralTask", 10000, NULL, 1, NULL);
   // Do not use display after this point, it is used by the peripheral task
-
-  delay(1000);
-
-  // TODO: This should probably not be done (it's alrady started)
-  //vTaskStartScheduler();
 }
 
 void loop() {
