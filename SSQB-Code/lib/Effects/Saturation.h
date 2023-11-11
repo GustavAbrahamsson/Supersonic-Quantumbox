@@ -158,7 +158,7 @@ class Saturation : public GenericEffect{
             soft_start = 1-InputValues[1];
             soft_end = s + 1;
             max_level = InputValues[0];
-        }
+        }  
 
     public:
         float DSP(float sample){

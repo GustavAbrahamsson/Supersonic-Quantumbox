@@ -6,7 +6,14 @@
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 
+
 class GenericEffect{
+    private:
+        Parameter params[6];
+        uint32_t numParams = 0;
+
+        virtual void updateParam(uint32_t index){};
+
     public:
         bool pass = false;
 
@@ -30,6 +37,26 @@ class GenericEffect{
 
         // set parameter values
         virtual void setInputValue(uint32_t index, float) = 0;
+
+        uint32_t getNumParams(){
+            return numParams;
+        };
+
+        String getParamName(uint32_t index){
+            if (index >= numParams){ return "None"; }
+            return params[index].getName();
+        };
+
+        float getParamValue(uint32_t index){
+            if (index >= numParams){ return 0.0f; }
+            return params[index].get();
+        };
+
+        void setParamValue(uint32_t index, float value){
+            if (index >= numParams){ return; }
+            params[index].set(value);
+            updateParam(index);
+        };
 
         // Passthough toggle
         void passTroughToggle(){

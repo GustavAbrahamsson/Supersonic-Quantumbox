@@ -7,5 +7,6 @@
 #include <LPF1/LPF1.h>
 #include <MaxFilter/MaxFilter.h>
 #include <Utils/Utils.h>
+#include <Parameter/Parameter.h>
 
 #endif
