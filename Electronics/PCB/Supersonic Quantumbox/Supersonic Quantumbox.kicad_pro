@@ -34,9 +34,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.3,
-          "height": 0.5,
-          "width": 0.5
+          "drill": 0.0,
+          "height": 3.1,
+          "width": 3.1
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -56,10 +56,7 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [
-        "courtyards_overlap|135249999|59719435|5a414042-c7a5-40df-9114-ac3267ce658f|690f1f40-cc34-4ea1-b6ee-36f61b23e9fd",
-        "courtyards_overlap|75097609|56750001|debe4818-80d7-41b1-9082-b67d99ab7e93|e852ac7d-4475-4eeb-a310-f30bdc209083"
-      ],
+      "drc_exclusions": [],
       "meta": {
         "version": 2
       },
@@ -95,7 +92,7 @@
         "padstack": "error",
         "pth_inside_courtyard": "ignore",
         "shorting_items": "error",
-        "silk_edge_clearance": "warning",
+        "silk_edge_clearance": "ignore",
         "silk_over_copper": "ignore",
         "silk_overlap": "ignore",
         "skew_out_of_range": "error",
@@ -447,7 +444,7 @@
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
         "name": "PWR",
-        "pcb_color": "rgb(255, 171, 110)",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.4,
         "via_diameter": 0.8,
